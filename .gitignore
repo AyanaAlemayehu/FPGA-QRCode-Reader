@@ -8,3 +8,4 @@
 #compilation folders (note this is for Windows)
 .Xil/
 obj/
+dump/ #note i use dump to contain my log files
