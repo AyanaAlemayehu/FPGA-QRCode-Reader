@@ -1,0 +1,10 @@
+#This file tells git to ignore certain files#
+#############################################
+
+#log files
+*.log
+*.jou
+
+#compilation folders (note this is for Windows)
+.Xil/
+obj/
