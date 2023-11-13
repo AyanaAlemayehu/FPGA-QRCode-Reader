@@ -11,7 +11,7 @@ module video_sig_gen
 (
   input wire clk_pixel_in,
   input wire rst_in,
-  output logic [$clog2(TOTAL_PIXELS)-1:0] hcount_out,
+  output logic [$clog2(TOTAL_COLS)-1:0] hcount_out,
   output logic [$clog2(TOTAL_LINES)-1:0] vcount_out,
   output logic vs_out,
   output logic hs_out,
@@ -19,10 +19,8 @@ module video_sig_gen
   output logic nf_out,
   output logic [5:0] fc_out);
  
-  localparam TOTAL_PIXELS = (ACTIVE_H_PIXELS + H_FRONT_PORCH + H_SYNC_WIDTH + H_BACK_PORCH)*(ACTIVE_LINES + V_BACK_PORCH + V_SYNC_WIDTH + V_FRONT_PORCH); //figure this out (change me)
+  localparam TOTAL_COLS = (ACTIVE_H_PIXELS + H_FRONT_PORCH + H_SYNC_WIDTH + H_BACK_PORCH);
   localparam TOTAL_LINES = (ACTIVE_LINES + V_FRONT_PORCH + V_SYNC_WIDTH + V_BACK_PORCH); //figure this out (change me)
-  localparam MAX_HORIZONTAL = (ACTIVE_H_PIXELS + H_FRONT_PORCH + H_SYNC_WIDTH + H_BACK_PORCH);
-  //your code here
 
   /*
     Basically split into two parts:
@@ -65,7 +63,7 @@ module video_sig_gen
             ad_out <= 0;
         end
         // hcount and vcount ALWAYS increase, does not matter what the rest of the ciruit is doing
-        if (hcount_out == MAX_HORIZONTAL - 1)begin
+        if (hcount_out == TOTAL_COLS - 1)begin
             hcount_out <= 0;
             if (vcount_out == TOTAL_LINES - 1)begin
                 vcount_out <= 0;

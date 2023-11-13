@@ -21,6 +21,7 @@ module top_level(
     VARIABLE INITIALIZATION
     --------------------------------------------------------------------
   */
+
     assign led = sw; //for debugging
     assign rgb1= 0;  //shut up those rgb LEDs (active high):
     assign rgb0 = 0;
@@ -83,6 +84,11 @@ module top_level(
 
     logic [9:0] tmds_10b [0:2]; //output of each TMDS encoder!
     logic tmds_signal [2:0]; //output of each TMDS serializer!
+
+  /*
+   PARAMETER INITIALIZATION
+   ---------------------------------------------------------------------
+  */
 
   //clock manager...creates 74.25 Hz and 5 times 74.25 MHz for pixel and TMDS,respectively
   hdmi_clk_wiz_720p mhdmicw (

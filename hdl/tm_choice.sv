@@ -51,7 +51,7 @@ module count_ones (
     assign c2 = (data_in[2] & data_in[3]);
     //rca2 them
     logic [3:0] sumOne;
-    rca2 adderOne(.a0({1'b0, c1, f0}), .b0({1'b0, c2, f1}), .c0(1'b0), .sum_out(sumOne));// no carry
+    rca2 adderOne(.a0({c1, f0}), .b0({c2, f1}), .c0(1'b0), .sum_out(sumOne));// no carry
 
     // repeat for the last half
     logic c3, c4;
@@ -64,14 +64,14 @@ module count_ones (
     assign c4 = (data_in[6] & data_in[7]);
     //rca2 them
     logic [3:0] sumTwo;
-    rca2 adderTwo(.a0({1'b0, c3, f2}), .b0({1'b0, c4, f3}), .c0(1'b0), .sum_out(sumTwo));// no carry
+    rca2 adderTwo(.a0({c3, f2}), .b0({c4, f3}), .c0(1'b0), .sum_out(sumTwo));// no carry
     // finally compute the output
-    rca4 adderThree(.a0({1'b0, sumOne}), .b0({1'b0, sumTwo}), .c0(1'b0), .sum_out(sum_out));
+    rca4 adderThree(.a0({sumOne}), .b0({sumTwo}), .c0(1'b0), .sum_out(sum_out));
 endmodule
 
 module rca2 (
-  input wire[2:0] a0,
-  input wire[2:0] b0,
+  input wire[1:0] a0,
+  input wire[1:0] b0,
   input wire c0,
   output logic[3:0] sum_out
 );
@@ -87,18 +87,18 @@ module rca2 (
   assign sum_out = {b22, b11, b00};
 endmodule
 
-module rca4 (
-  input wire[4:0] a0,
-  input wire[4:0] b0,
+module rca4 (// modified rca4 to drop final carry
+  input wire[3:0] a0,
+  input wire[3:0] b0,
   input wire c0,
-  output logic[5:0] sum_out
+  output logic[4:0] sum_out
 );
   logic[3:0] lower, upper;
 
-  rca2 addLowerHalf(.a0({1'b0, a0[1:0]}), .b0({1'b0, b0[1:0]}), .c0(c0), .sum_out(lower));
-  rca2 addUpperHalf(.a0({1'b0, a0[3:2]}), .b0({1'b0, b0[3:2]}), .c0(lower[2]), .sum_out(upper));
+  rca2 addLowerHalf(.a0({a0[1:0]}), .b0({b0[1:0]}), .c0(c0), .sum_out(lower));
+  rca2 addUpperHalf(.a0({a0[3:2]}), .b0({b0[3:2]}), .c0(lower[2]), .sum_out(upper));
 
-  assign sum_out = {upper, lower[1:0]};
+  assign sum_out = {upper[2:0], lower[1:0]};
 endmodule
 
 `default_nettype wire
