@@ -3,6 +3,7 @@
 ## COMPLETED
 - creating skeleton of stage one from lab 5
 - got rid of most warnings
+- converted camera output into binary output with adjustable threshold
 
 ## TODO
 - need to still pin down the physical setup of the camera stuff?

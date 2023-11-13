@@ -68,8 +68,8 @@ module top_level(
     logic [1:0] valid_addr_rot_pipe; //pipelining variables in || with frame_buffer
 
     //values from the frame buffer:
-    logic [15:0] frame_buff_raw; //output of frame buffer (direct)
-    logic [15:0] frame_buff; //output of frame buffer OR black (based on pipeline valid)
+    logic frame_buff_raw; //output of frame buffer (direct)
+    logic frame_buff; //output of frame buffer OR black (based on pipeline valid)
 
     //remapped frame_buffer outputs with 8 bits for r, g, b
     logic [7:0] fb_red, fb_green, fb_blue;
@@ -180,15 +180,24 @@ module top_level(
     .valid_addr_out(valid_addr_rot)
     );
 
+
+  // calculate binarized version
+  binary bin(
+    .clk_in(clk_pixel),
+    .pixel_in(pixel_data_rec),
+    .thresh_in(sw[15:8]),
+    .bin_out(bin_out)
+  );
+
   //Framebuffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
-    .RAM_WIDTH(16), //each entry in this memory is 16 bits
+    .RAM_WIDTH(1), //each entry in this memory is 16 bits
     .RAM_DEPTH(WIDTH*HEIGHT)) //there are 240*320 or 76800 entries for full frame
     frame_buffer (
     .addra(hcount_rec + WIDTH*vcount_rec), //pixels are stored using this math
     .clka(clk_pixel),
     .wea(data_valid_rec),
-    .dina(pixel_data_rec),
+    .dina(bin_out),
     .ena(1'b1),
     .regcea(1'b1),
     .rsta(sys_rst),
@@ -208,31 +217,12 @@ module top_level(
     valid_addr_rot_pipe[0] <= valid_addr_rot;
     valid_addr_rot_pipe[1] <= valid_addr_rot_pipe[0];
   end
-  assign frame_buff = valid_addr_rot_pipe[1]?frame_buff_raw:16'b0;
+  assign frame_buff = valid_addr_rot_pipe[1]?frame_buff_raw:1'b0;
 
-  // //split fame_buff into 3 8 bit color channels (5:6:5 adjusted accordingly)
-  // assign fb_red = {frame_buff[15:11],3'b0};
-  // assign fb_green = {frame_buff[10:5], 2'b0};
-  // assign fb_blue = {frame_buff[4:0],3'b0};
-
-  // calculate binarized version
-  binary bin(
-    .clk_in(clk_pixel),
-    .pixel_in(frame_buff),
-    .thresh_in(sw[15:8]),
-    .bin_out(bin_out)
-  );
-
-  // binarized output routed directly to tmds encoders
-  assign red = frame_buff == 16'b0 ? 8'b0 : bin_out;
-  assign green = frame_buff == 16'b0 ? 8'b0 : bin_out;
-  assign blue = frame_buff == 16'b0 ? 8'b0 : bin_out;
-
-
-  // // Camera output routed directly to tmds encoders
-  // assign red = fb_red;
-  // assign green = fb_green;
-  // assign blue = fb_blue;
+  // binarized output routed directly to tmds encoders after 8 bit conversion
+  assign red = frame_buff == 1'b0 ? 8'b0 : 8'd255;
+  assign green = frame_buff == 1'b0 ? 8'b0 : 8'd255;
+  assign blue = frame_buff == 1'b0 ? 8'b0 : 8'd255;
 
   //three tmds_encoders (blue, green, red)
   tmds_encoder tmds_red(
