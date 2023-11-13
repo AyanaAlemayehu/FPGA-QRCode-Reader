@@ -1,7 +1,10 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module rotate (
+module rotate #(
+  parameter HEIGHT = 320,//<- change back to 480 but I have no idea what the issue is
+  parameter WIDTH = 320
+)(
   input wire clk_in,
   input wire rst_in,
   input wire[10:0] hcount_in,
@@ -14,7 +17,7 @@ module rotate (
   logic [9:0] rot_vcount;
 
   always_comb begin
-    rot_hcount = 319-vcount_in;
+    rot_hcount = (HEIGHT - 1) - vcount_in;
     rot_vcount = hcount_in;
   end
   always_ff @(posedge clk_in)begin
@@ -24,7 +27,7 @@ module rotate (
     end else begin
       valid_addr_out <= valid_addr_in;
       if (valid_addr_in)begin
-        pixel_addr_out <= 320*rot_vcount + rot_hcount;
+        pixel_addr_out <= WIDTH*rot_vcount + rot_hcount;
       end
     end
   end

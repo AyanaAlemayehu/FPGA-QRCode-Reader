@@ -87,8 +87,8 @@ module top_level(
    PARAMETER INITIALIZATION
    ---------------------------------------------------------------------
   */
-    localparam WIDTH = 320;
-    localparam HEIGHT = 240;
+    localparam WIDTH = 480;
+    localparam HEIGHT = 480;
 
   //clock manager...creates 74.25 Hz and 5 times 74.25 MHz for pixel and TMDS,respectively
   hdmi_clk_wiz_720p mhdmicw (

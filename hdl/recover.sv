@@ -1,4 +1,6 @@
-module recover (
+module recover #(
+  parameter WIDTH = 480 // note frame_done_in determines height, so unnecessary to decide here
+)(
   input wire valid_pixel_in,
   input wire [15:0] pixel_in,
   input wire frame_done_in,
@@ -33,7 +35,7 @@ module recover (
       if (valid_pixel_in && ~old_valid_pixel_in)begin
         data_valid_out <= 1;
         pixel_out <= pixel_in;
-        if (hcount==319)begin
+        if (hcount==WIDTH - 1)begin
           hcount <= 0;
           vcount <= vcount +1;
         end else begin
