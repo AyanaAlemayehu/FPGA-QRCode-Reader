@@ -74,10 +74,8 @@ module top_level(
     //remapped frame_buffer outputs with 8 bits for r, g, b
     logic [7:0] fb_red, fb_green, fb_blue;
 
-    //output of rgb to ycrcb conversion (10 bits due to module): (UNUSED RIGHT NOW (LIKELY NEEDS TO BE PIPELINED))
-    logic [9:0] y_full, cr_full, cb_full; //ycrcb conversion of full pixel
-    //bottom 8 of y, cr, cb conversions:
-    logic [7:0] y, cr, cb; //ycrcb conversion of full pixel
+    //binarized output
+    logic [7:0] bin_out;
 
     //final processed red, gren, blue for consumption in tmds module
     logic [7:0] red, green, blue;
@@ -89,6 +87,8 @@ module top_level(
    PARAMETER INITIALIZATION
    ---------------------------------------------------------------------
   */
+    localparam WIDTH = 320;
+    localparam HEIGHT = 240;
 
   //clock manager...creates 74.25 Hz and 5 times 74.25 MHz for pixel and TMDS,respectively
   hdmi_clk_wiz_720p mhdmicw (
@@ -183,9 +183,9 @@ module top_level(
   //Framebuffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
     .RAM_WIDTH(16), //each entry in this memory is 16 bits
-    .RAM_DEPTH(320*240)) //there are 240*320 or 76800 entries for full frame
+    .RAM_DEPTH(WIDTH*HEIGHT)) //there are 240*320 or 76800 entries for full frame
     frame_buffer (
-    .addra(hcount_rec + 320*vcount_rec), //pixels are stored using this math
+    .addra(hcount_rec + WIDTH*vcount_rec), //pixels are stored using this math
     .clka(clk_pixel),
     .wea(data_valid_rec),
     .dina(pixel_data_rec),
@@ -210,33 +210,29 @@ module top_level(
   end
   assign frame_buff = valid_addr_rot_pipe[1]?frame_buff_raw:16'b0;
 
-  //split fame_buff into 3 8 bit color channels (5:6:5 adjusted accordingly)
-  assign fb_red = {frame_buff[15:11],3'b0};
-  assign fb_green = {frame_buff[10:5], 2'b0};
-  assign fb_blue = {frame_buff[4:0],3'b0};
+  // //split fame_buff into 3 8 bit color channels (5:6:5 adjusted accordingly)
+  // assign fb_red = {frame_buff[15:11],3'b0};
+  // assign fb_green = {frame_buff[10:5], 2'b0};
+  // assign fb_blue = {frame_buff[4:0],3'b0};
 
-  // Camera output routed directly to tmds encoders
-  assign red = fb_red;
-  assign green = fb_green;
-  assign blue = fb_blue;
-
-  //Convert RGB of full pixel to YCrCb
-  //Module has a 3 cycle latency
-  //Kept for thresholding calculations (through luminance)
-  rgb_to_ycrcb rgbtoycrcb_m(
+  // calculate binarized version
+  binary bin(
     .clk_in(clk_pixel),
-    .r_in(fb_red),
-    .g_in(fb_green),
-    .b_in(fb_blue),
-    .y_out(y_full),
-    .cr_out(cr_full),
-    .cb_out(cb_full)
+    .pixel_in(frame_buff),
+    .thresh_in(sw[15:8]),
+    .bin_out(bin_out)
   );
 
-  //take lower 8 of full outputs
-  assign y = y_full[7:0];
-  assign cr = cr_full[7:0];
-  assign cb = cb_full[7:0];
+  // binarized output routed directly to tmds encoders
+  assign red = frame_buff == 16'b0 ? 8'b0 : bin_out;
+  assign green = frame_buff == 16'b0 ? 8'b0 : bin_out;
+  assign blue = frame_buff == 16'b0 ? 8'b0 : bin_out;
+
+
+  // // Camera output routed directly to tmds encoders
+  // assign red = fb_red;
+  // assign green = fb_green;
+  // assign blue = fb_blue;
 
   //three tmds_encoders (blue, green, red)
   tmds_encoder tmds_red(
