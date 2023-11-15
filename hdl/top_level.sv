@@ -17,6 +17,12 @@ module top_level(
   output logic pmodblock
   );
 
+  /* 
+    CONTROLS:
+    - sw[0] captures a photo
+    - sw[15] -> sw[8] control the threshold (on 0 - 255 scale)
+  */
+
   /*
     VARIABLE INITIALIZATION
     --------------------------------------------------------------------
@@ -228,7 +234,7 @@ module top_level(
     frame_buffer (
     .addra(hcount_rec_pipe[2] + STORED_WIDTH*vcount_rec_pipe[2]), //pixels are stored using this math
     .clka(clk_pixel),
-    .wea(data_valid_rec_pipe[2] && hcount_rec_pipe[2] < STORED_HEIGHT && vcount_rec_pipe[2] < STORED_WIDTH),
+    .wea(~sw[0] && data_valid_rec_pipe[2] && hcount_rec_pipe[2] < STORED_HEIGHT && vcount_rec_pipe[2] < STORED_WIDTH),
     .dina(bin_out),
     .ena(1'b1),
     .regcea(1'b1),
