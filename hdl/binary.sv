@@ -6,7 +6,7 @@ module binary
         input wire clk_in,
         input wire [15:0] pixel_in, // assumed to be in the camera's 16 bit format
         input wire [8:0] thresh_in,
-        output logic [7:0]bin_out // the 1/0 version of the pixel_in (8 BIT FOR TESTING RN),
+        output logic bin_out // the 1/0 version of the pixel_in (8 BIT FOR TESTING RN),
                                   // defined by the threshold and y chromincance of input
     );
 
@@ -31,7 +31,7 @@ module binary
     .y_out(y_full)
     );
 
-    assign bin_out = y_pipe[2] < thresh_in ? 8'd0 : 8'd255;
+    assign bin_out = y_pipe[2] < thresh_in ? 1'b0 : 1'b1;
 
 endmodule
 `default_nettype wire

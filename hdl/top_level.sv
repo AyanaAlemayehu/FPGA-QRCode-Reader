@@ -63,7 +63,7 @@ module top_level(
     logic valid_addr_scaled; //whether or not two values above are valid (or out of frame)
 
     //outputs of the rotation module:
-    logic [16:0] img_addr_rot; //result of image transformation rotation
+    logic [19:0] img_addr_rot; //result of image transformation rotation
     logic valid_addr_rot; //forward propagated valid_addr_scaled
     logic [1:0] valid_addr_rot_pipe; //pipelining variables in || with frame_buffer
 
@@ -75,7 +75,7 @@ module top_level(
     logic [7:0] fb_red, fb_green, fb_blue;
 
     //binarized output
-    logic [7:0] bin_out;
+    logic bin_out;
 
     //final processed red, gren, blue for consumption in tmds module
     logic [7:0] red, green, blue;
@@ -87,8 +87,30 @@ module top_level(
    PARAMETER INITIALIZATION
    ---------------------------------------------------------------------
   */
-    localparam WIDTH = 480;
+    localparam WIDTH = 640;// note its flipped because image is stored rotated
     localparam HEIGHT = 480;
+
+
+  /*
+    PIPELINES
+    --------------------------------------------------------------------
+  */
+    // 3 stage pipelines
+    logic data_valid_rec_pipe[2:0];
+    logic [10:0] hcount_rec_pipe [2:0];
+    logic [9:0] vcount_rec_pipe [2:0];
+    always_ff @(posedge clk_pixel) begin
+      data_valid_rec_pipe[0] <= data_valid_rec;
+      hcount_rec_pipe[0] <= hcount_rec;
+      vcount_rec_pipe[0] <= vcount_rec;
+      for (int i = 1; i < 3; i=i+1)begin
+        data_valid_rec_pipe[i] <= data_valid_rec_pipe[i-1];
+        hcount_rec_pipe[i] <= hcount_rec_pipe[i-1];
+        vcount_rec_pipe[i] <= vcount_rec_pipe[i-1];
+      end
+    end
+
+
 
   //clock manager...creates 74.25 Hz and 5 times 74.25 MHz for pixel and TMDS,respectively
   hdmi_clk_wiz_720p mhdmicw (
@@ -192,11 +214,11 @@ module top_level(
   //Framebuffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
     .RAM_WIDTH(1), //each entry in this memory is 16 bits
-    .RAM_DEPTH(WIDTH*HEIGHT)) //there are 240*320 or 76800 entries for full frame
+    .RAM_DEPTH(WIDTH*HEIGHT))
     frame_buffer (
-    .addra(hcount_rec + WIDTH*vcount_rec), //pixels are stored using this math
+    .addra(hcount_rec_pipe[2] + WIDTH*vcount_rec_pipe[2]), //pixels are stored using this math
     .clka(clk_pixel),
-    .wea(data_valid_rec),
+    .wea(data_valid_rec_pipe[2]),
     .dina(bin_out),
     .ena(1'b1),
     .regcea(1'b1),

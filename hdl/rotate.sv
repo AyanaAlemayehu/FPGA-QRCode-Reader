@@ -2,22 +2,21 @@
 `default_nettype none
 
 module rotate #(
-  parameter HEIGHT = 320,//<- change back to 480 but I have no idea what the issue is
-  parameter WIDTH = 320
+  parameter WIDTH = 640 // again image is stored rotated, so width is our final height
 )(
   input wire clk_in,
   input wire rst_in,
   input wire[10:0] hcount_in,
   input wire [9:0] vcount_in,
   input wire valid_addr_in,
-  output logic [16:0] pixel_addr_out,
+  output logic [18:0] pixel_addr_out,
   output logic valid_addr_out);
 
   logic [10:0] rot_hcount;
   logic [9:0] rot_vcount;
 
   always_comb begin
-    rot_hcount = (HEIGHT - 1) - vcount_in;
+    rot_hcount = (WIDTH - 1) - vcount_in;
     rot_vcount = hcount_in;
   end
   always_ff @(posedge clk_in)begin

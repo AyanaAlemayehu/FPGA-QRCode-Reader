@@ -1,5 +1,5 @@
 module recover #(
-  parameter WIDTH = 480 // note frame_done_in determines height, so unnecessary to decide here
+  parameter WIDTH = 640 // again image is stored rotated
 )(
   input wire valid_pixel_in,
   input wire [15:0] pixel_in,
