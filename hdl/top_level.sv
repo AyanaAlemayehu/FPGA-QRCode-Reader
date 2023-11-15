@@ -87,8 +87,12 @@ module top_level(
    PARAMETER INITIALIZATION
    ---------------------------------------------------------------------
   */
-    localparam WIDTH = 640;// note its flipped because image is stored rotated
+    // why two different height/widths? Because camera is outputting 640x480, but we are only using 480x480 of its output
+    // to store in the BRAM. Thus, depending on where the module is in the pipeline, we will use different paramters
+    localparam WIDTH = 640;// note its flipped because image is stored rotated (thus this should be the higher number)
     localparam HEIGHT = 480;
+    localparam STORED_WIDTH = 480;
+    localparam STORED_HEIGHT = 480;
 
 
   /*
@@ -168,7 +172,9 @@ module top_level(
   // * 5-6-5 pixels of camera information
   // * corresponding hcount and vcount for that pixel
   // * single-cycle valid indicator
-  recover recover_m (
+  recover #(.WIDTH(WIDTH))
+  recover_m
+  (
     .valid_pixel_in(valid_pixel),
     .pixel_in(cam_pixel),
     .frame_done_in(frame_done),
@@ -181,8 +187,10 @@ module top_level(
   );
 
   // scale
-  scale(
-    .scale_in({sw[0],btn[1]}),
+  scale #(.WIDTH(STORED_WIDTH),
+        .HEIGHT(STORED_HEIGHT))
+  scalemodule 
+  (
     .hcount_in(hcount),
     .vcount_in(vcount),
     .scaled_hcount_out(hcount_scaled),
@@ -192,7 +200,9 @@ module top_level(
 
   //Rotates and mirror-images Image to render correctly (pi/2 CCW rotate):
   // The output address should be fed right into the frame buffer for lookup
-  rotate rotate_m (
+  rotate #(.WIDTH(STORED_WIDTH))
+  rotate_m 
+  (
     .clk_in(clk_pixel),
     .rst_in(sys_rst),
     .hcount_in(hcount_scaled),
@@ -213,12 +223,12 @@ module top_level(
 
   //Framebuffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
-    .RAM_WIDTH(1), //each entry in this memory is 16 bits
-    .RAM_DEPTH(WIDTH*HEIGHT))
+    .RAM_WIDTH(1), //each entry in this memory is 1 bit
+    .RAM_DEPTH(STORED_WIDTH*STORED_HEIGHT))
     frame_buffer (
-    .addra(hcount_rec_pipe[2] + WIDTH*vcount_rec_pipe[2]), //pixels are stored using this math
+    .addra(hcount_rec_pipe[2] + STORED_WIDTH*vcount_rec_pipe[2]), //pixels are stored using this math
     .clka(clk_pixel),
-    .wea(data_valid_rec_pipe[2]),
+    .wea(data_valid_rec_pipe[2] && hcount_rec_pipe[2] < STORED_HEIGHT && vcount_rec_pipe[2] < STORED_WIDTH),
     .dina(bin_out),
     .ena(1'b1),
     .regcea(1'b1),
