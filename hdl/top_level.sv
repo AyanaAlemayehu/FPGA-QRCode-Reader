@@ -218,7 +218,6 @@ module top_level(
     .valid_addr_out(valid_addr_rot)
     );
 
-
   // calculate binarized version
   binary bin(
     .clk_in(clk_pixel),
