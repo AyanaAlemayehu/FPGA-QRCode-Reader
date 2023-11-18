@@ -1,4 +1,13 @@
-# CURRENT OBJECTIVE: STAGE ONE
+# CURRENT OBJECTIVE: STAGE TWO
+
+## COMPLETED
+- made a rough idea of the average module
+
+## TODO
+- augment the top_level to multiplex HDMI output between frame_buffer & BRAM_one
+- fix averaging
+
+# OLD OBJECTIVES
 
 ## COMPLETED
 - creating skeleton of stage one from lab 5
@@ -8,6 +17,5 @@
 - completed the rest of the modules in stage one
 
 
-## TODO
-- need to still pin down the physical setup of the camera stuff?
-- need to create the total skeleton/state machine of the project
+
+
