@@ -8,11 +8,13 @@ module average
         input wire clk_in,
         input wire rst_in,
         input wire buffer_pixel_data,
+        input wire start_average,
 
         output logic[18:0] buffer_address,
         output logic[18:0] BRAM_one_address,
         output logic BRAM_one_data,
-        output logic BRAM_one_data_valid
+        output logic BRAM_one_data_valid,
+        output logic average_finished
     );
 
     logic [8:0] center_x, center_y;
@@ -44,10 +46,12 @@ module average
             center_x <= 0;
             center_y <= 0;
             neighbors <= 9'b0;
+            average_finished <= 1'b0;
         end
         else begin
             if (state == RESET) begin
-                state <= GRAB;
+                if (start_average)
+                    state <= GRAB;
                 neighbor_counter <= 4'b0;
             end
             else if (state == GRAB) begin
@@ -85,10 +89,10 @@ module average
                 // two cases, we either have all of the neighbors (and need to average) or dont
                 if (neighbor_counter == 4'd8) begin
                     neighbor_counter <= 0;
-                    state == AVERAGE;
+                    state <= AVERAGE;
                 end
                 else begin
-                    state == GRAB;
+                    state <= GRAB;
                 end
             end
             else if (state == AVERAGE) begin
@@ -96,6 +100,7 @@ module average
                 if (center_x == WIDTH - 1) begin
                     if (center_y == HEIGHT - 1) begin
                         state <= FINISHED;
+                        average_finished <= 1'b1;
                     end
                     else begin
                         center_x <= 0;
@@ -111,6 +116,9 @@ module average
                 BRAM_one_address <= center_x + center_y*WIDTH;
                 BRAM_one_data <= num_ones > 4;
                 BRAM_one_data_valid <= 1'b1;
+            end
+            else if (state == FINISHED) begin
+                average_finished <= 1'b0;
             end
         end
     end

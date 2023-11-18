@@ -111,7 +111,7 @@ module top_level(
 
     always_ff @(posedge clk_pixel) begin
 
-      if (rst_in) begin
+      if (sys_rst) begin
           state <= RESET;
 
       end else begin
@@ -134,9 +134,8 @@ module top_level(
             // averaging is when applying the sharpening kernel, it end when reciving a finishing signel from average module.
             // during this stage, the hdmi should show nothing, until the image is sharpened.
                         // if recived an end signal from average module, move to streaming2 state
+                        state <= average_finished == 1'b1 ? STREAMING2 : AVERAGING;
                     end 
-
-          default:
           endcase
       end
     end 
@@ -277,6 +276,7 @@ module top_level(
 
   logic buffer_averaging_pixel;
   logic [19:0] buffer_averaging_address;
+  logic average_finished;
 
   //BRAM1 related variables
   // only writing through average
@@ -317,11 +317,13 @@ module top_level(
     (
       .clk_in(clk_pixel),
       .rst_in(sys_rst),
+      .start_average(sw[1]),
       .buffer_pixel_data(buffer_averaging_pixel),
-      .buffer_address(frame_buffer_reading_address),
+      .buffer_address(buffer_averaging_address),
       .BRAM_one_address(BRAM_one_average_address),
       .BRAM_one_data(BRAM_one_average_pixel),
-      .BRAM_one_data_valid(BRAM_one_average_data_valid)
+      .BRAM_one_data_valid(BRAM_one_average_data_valid),
+      .average_finished(average_finished)
     );
 
   //BRAM1
@@ -329,7 +331,7 @@ module top_level(
     .RAM_WIDTH(1),
     .RAM_DEPTH(STORED_WIDTH*STORED_HEIGHT))
     bram_one (
-    .addra(BRAM_one_average_pixel),
+    .addra(BRAM_one_average_address),
     .clka(clk_pixel),
     .wea(BRAM_one_average_data_valid),
     .dina(BRAM_one_average_pixel),
@@ -373,7 +375,7 @@ module top_level(
         // reading frame buffer goes to hdmi if state is streaming
         BRAM_one_reading_address = img_addr_rot;
         BRAM_one_reading_enb = valid_addr_rot;
-        hdmi_out_raw_pixel = BRAM_one_reading_pixel;
+        // hdmi_out_raw_pixel = BRAM_one_reading_pixel;   //already written in hdmi control
       end
 
       else begin
@@ -395,7 +397,7 @@ module top_level(
     AVERAGING: hdmi_out_raw_pixel = 1'b0;
     STREAMING2: hdmi_out_raw_pixel = BRAM_one_reading_pixel;
     //other states
-    default: 1'b0
+    default: hdmi_out_raw_pixel = 1'b0;
 
     endcase
   end
