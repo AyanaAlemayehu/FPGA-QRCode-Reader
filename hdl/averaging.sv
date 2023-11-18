@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
 `default_nettype none
-// binarizes the input pixels for storage in the framebuffer, grabs data from recover.sv
 module average
     #(parameter WIDTH = 480,
       parameter HEIGHT = 480)

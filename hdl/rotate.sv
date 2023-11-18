@@ -9,7 +9,7 @@ module rotate #(
   input wire[10:0] hcount_in,
   input wire [9:0] vcount_in,
   input wire valid_addr_in,
-  output logic [18:0] pixel_addr_out,
+  output logic [19:0] pixel_addr_out,
   output logic valid_addr_out);
 
   logic [10:0] rot_hcount;
