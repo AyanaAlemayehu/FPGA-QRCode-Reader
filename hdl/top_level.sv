@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, STREAMING2, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -134,7 +134,7 @@ module top_level(
             // averaging is when applying the sharpening kernel, it end when reciving a finishing signel from average module.
             // during this stage, the hdmi should show nothing, until the image is sharpened.
                         // if recived an end signal from average module, move to streaming2 state
-                        state <= average_finished == 1'b1 ? STREAMING2 : AVERAGING;
+                        state <= average_finished == 1'b1 ? FINISHED : AVERAGING;
                     end 
           endcase
       end
@@ -370,16 +370,14 @@ module top_level(
         frame_buffer_reading_enb = 1'b1;
       end
 
-      if (state == STREAMING2) begin
+      if (state == FINISHED) begin
         // add switches to control what's on hdmi after this stage.
         // reading frame buffer goes to hdmi if state is streaming
         BRAM_one_reading_address = img_addr_rot;
         BRAM_one_reading_enb = valid_addr_rot;
+        frame_buffer_reading_address = img_addr_rot;
+        frame_buffer_reading_enb = valid_addr_rot;
         // hdmi_out_raw_pixel = BRAM_one_reading_pixel;   //already written in hdmi control
-      end
-
-      else begin
-        //other states like horz/vert patterns
       end
 
     end
@@ -391,14 +389,10 @@ module top_level(
 
   // Controling what goes on screen
   always_comb begin  //add switches
-    case (state)
-    RESET: hdmi_out_raw_pixel = 1'b0;
-    STREAMING1: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
-    AVERAGING: hdmi_out_raw_pixel = 1'b0;
-    STREAMING2: hdmi_out_raw_pixel = BRAM_one_reading_pixel;
-    //other states
-    default: hdmi_out_raw_pixel = 1'b0;
-
+    case ({sw[4], sw[3]})
+      2'b00: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
+      2'b01: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
+      default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end
 
