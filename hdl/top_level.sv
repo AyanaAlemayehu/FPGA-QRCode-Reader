@@ -19,7 +19,9 @@ module top_level(
 
   /* 
     CONTROLS:
-    - sw[0] captures a photo
+    - sw[0] captures a photo, frame_buffer on screen
+    - sw[1] starts the decoding process
+    - sw[2] BRAM1 on screen
     - sw[15] -> sw[8] control the threshold (on 0 - 255 scale)
   */
 
@@ -73,10 +75,6 @@ module top_level(
     logic valid_addr_rot; //forward propagated valid_addr_scaled
     logic [1:0] valid_addr_rot_pipe; //pipelining variables in || with frame_buffer
 
-    //values from the frame buffer:
-    logic frame_buff_raw; //output of frame buffer (direct)
-    logic frame_buff; //output of frame buffer OR black (based on pipeline valid)
-
     //remapped frame_buffer outputs with 8 bits for r, g, b
     logic [7:0] fb_red, fb_green, fb_blue;
 
@@ -88,6 +86,10 @@ module top_level(
 
     logic [9:0] tmds_10b [0:2]; //output of each TMDS encoder!
     logic tmds_signal [2:0]; //output of each TMDS serializer!
+
+    // values to go on hdmi, read from Memory or zero depending on the state.
+    logic hdmi_out_raw_pixel;   // pixel value read from a certain BRAM (direct)
+    logic hdmi_out_pixel;   // what to go on screen, from hdmi_out_raw_pixel, (based on pipeline valid)
 
   /*
    PARAMETER INITIALIZATION
@@ -102,10 +104,52 @@ module top_level(
 
 
   /*
+    Top Level State Maching
+  */
+    typedef enum {RESET, STREAMING1, AVERAGING, STREAMING2, FINISHED} fsm_state;
+    fsm_state state = RESET; // check here for errors
+
+    always_ff @(posedge clk_pixel) begin
+
+      if (rst_in) begin
+          state <= RESET;
+
+      end else begin
+
+          case (state)
+          RESET: begin
+                    state <= STREAMING1;
+                end
+
+          STREAMING1: begin
+            // streaming1 is when taking picture, it ends when both capturing and starting_decoding switches are on.
+            // during this stage, the pixels from frame buffer on hdmi
+
+                          if (sw[0] && sw[1]) begin
+                            state <= AVERAGING;
+                          end
+          end
+
+          AVERAGING: begin    
+            // averaging is when applying the sharpening kernel, it end when reciving a finishing signel from average module.
+            // during this stage, the hdmi should show nothing, until the image is sharpened.
+                        // if recived an end signal from average module, move to streaming2 state
+                    end 
+
+          default:
+          endcase
+      end
+    end 
+
+
+
+
+
+  /*
     PIPELINES
     --------------------------------------------------------------------
   */
-    // 3 stage pipelines
+    // 3 stage pipelines for hdmi: should always exists regardless of the stage of decoding
     logic data_valid_rec_pipe[2:0];
     logic [10:0] hcount_rec_pipe [2:0];
     logic [9:0] vcount_rec_pipe [2:0];
@@ -120,8 +164,6 @@ module top_level(
       end
     end
 
-
-
   //clock manager...creates 74.25 Hz and 5 times 74.25 MHz for pixel and TMDS,respectively
   hdmi_clk_wiz_720p mhdmicw (
       .clk_pixel(clk_pixel),
@@ -130,7 +172,7 @@ module top_level(
       .locked(locked),
       .clk_ref(clk_100mhz)
   );
-  
+
   //Clock domain crossing to synchronize the camera's clock
   //to be back on the 65MHz system clock, delayed by a clock cycle.
   always_ff @(posedge clk_pixel) begin
@@ -192,6 +234,14 @@ module top_level(
     .vcount_out(vcount_rec) //corresponding vcount of camera pixel
   );
 
+  // calculate binarized version
+  binary bin(
+    .clk_in(clk_pixel),
+    .pixel_in(pixel_data_rec),
+    .thresh_in(sw[15:8]),
+    .bin_out(bin_out)
+  );
+
   // scale
   scale #(.WIDTH(STORED_WIDTH),
         .HEIGHT(STORED_HEIGHT))
@@ -219,13 +269,25 @@ module top_level(
     );
 
 
-  // calculate binarized version
-  binary bin(
-    .clk_in(clk_pixel),
-    .pixel_in(pixel_data_rec),
-    .thresh_in(sw[15:8]),
-    .bin_out(bin_out)
-  );
+
+  // frame buffer variables
+  logic [19:0] frame_buffer_reading_address;
+  logic frame_buffer_reading_pixel;
+  logic frame_buffer_reading_enb;
+
+  logic buffer_averaging_pixel;
+  logic [19:0] buffer_averaging_address;
+
+  //BRAM1 related variables
+  // only writing through average
+  logic BRAM_one_average_pixel;
+  logic [19:0] BRAM_one_average_address;
+  logic BRAM_one_average_data_valid;
+
+  logic [19:0] BRAM_one_reading_address;
+  logic BRAM_one_reading_pixel;
+  logic BRAM_one_reading_enb;
+  
 
   //Framebuffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
@@ -240,27 +302,118 @@ module top_level(
     .regcea(1'b1),
     .rsta(sys_rst),
     .douta(), //never read from this side
-    .addrb(img_addr_rot),//transformed lookup pixel
+    .addrb(frame_buffer_reading_address),
     .dinb(16'b0),
     .clkb(clk_pixel),
     .web(1'b0),
-    .enb(valid_addr_rot),
+    .enb(frame_buffer_reading_enb),
     .rstb(sys_rst),
     .regceb(1'b1),
-    .doutb(frame_buff_raw)
+    .doutb(frame_buffer_reading_pixel)
   );
-  
-  // pipelined valid_addr_rot to take care of BRAM 2 clock latency
+
+  average #(.WIDTH(STORED_WIDTH), .HEIGHT(STORED_HEIGHT))
+  average_m
+    (
+      .clk_in(clk_pixel),
+      .rst_in(sys_rst),
+      .buffer_pixel_data(buffer_averaging_pixel),
+      .buffer_address(frame_buffer_reading_address),
+      .BRAM_one_address(BRAM_one_average_address),
+      .BRAM_one_data(BRAM_one_average_pixel),
+      .BRAM_one_data_valid(BRAM_one_average_data_valid)
+    );
+
+  //BRAM1
+  xilinx_true_dual_port_read_first_2_clock_ram #(
+    .RAM_WIDTH(1),
+    .RAM_DEPTH(STORED_WIDTH*STORED_HEIGHT))
+    bram_one (
+    .addra(BRAM_one_average_pixel),
+    .clka(clk_pixel),
+    .wea(BRAM_one_average_data_valid),
+    .dina(BRAM_one_average_pixel),
+    .ena(1'b1),
+    .regcea(1'b1),
+    .rsta(sys_rst),
+    .douta(),
+
+    .addrb(BRAM_one_reading_address),
+    .dinb(1'b0),
+    .clkb(clk_pixel),
+    .web(1'b0),
+    .enb(BRAM_one_reading_enb),
+    .rstb(sys_rst),
+    .regceb(1'b1),
+    .doutb(BRAM_one_reading_pixel)
+  );
+
+
+
+  /*
+    Controling Memory Ports
+  */
+    always_comb begin
+      if (state == STREAMING1) begin
+        // reading frame buffer goes to hdmi if state is streaming1
+        frame_buffer_reading_address = img_addr_rot;
+        frame_buffer_reading_enb = valid_addr_rot;
+        // hdmi_out_raw_pixel = frame_buffer_reading_pixel;  //already written in hdmi control
+      end
+
+      else if (state == AVERAGING) begin
+        // reading frame buffer goes to average if state is AVERAGING
+        frame_buffer_reading_address = buffer_averaging_address;
+        buffer_averaging_pixel = frame_buffer_reading_pixel;
+        frame_buffer_reading_enb = 1'b1;
+      end
+
+      if (state == STREAMING2) begin
+        // add switches to control what's on hdmi after this stage.
+        // reading frame buffer goes to hdmi if state is streaming
+        BRAM_one_reading_address = img_addr_rot;
+        BRAM_one_reading_enb = valid_addr_rot;
+        hdmi_out_raw_pixel = BRAM_one_reading_pixel;
+      end
+
+      else begin
+        //other states like horz/vert patterns
+      end
+
+    end
+
+
+  /*
+    WHAT TO SHOW ON SCREEN:
+  */
+
+  // Controling what goes on screen
+  always_comb begin  //add switches
+    case (state)
+    RESET: hdmi_out_raw_pixel = 1'b0;
+    STREAMING1: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
+    AVERAGING: hdmi_out_raw_pixel = 1'b0;
+    STREAMING2: hdmi_out_raw_pixel = BRAM_one_reading_pixel;
+    //other states
+    default: 1'b0
+
+    endcase
+  end
+
+
+ // pipelined valid_addr_rot to take care of BRAM 2 clock latency
   always_ff @(posedge clk_pixel)begin
     valid_addr_rot_pipe[0] <= valid_addr_rot;
     valid_addr_rot_pipe[1] <= valid_addr_rot_pipe[0];
   end
-  assign frame_buff = valid_addr_rot_pipe[1]?frame_buff_raw:1'b0;
+
+  assign hdmi_out_pixel = valid_addr_rot_pipe[1]?hdmi_out_raw_pixel:1'b0;
 
   // binarized output routed directly to tmds encoders after 8 bit conversion
-  assign red = frame_buff == 1'b0 ? 8'b0 : 8'd255;
-  assign green = frame_buff == 1'b0 ? 8'b0 : 8'd255;
-  assign blue = frame_buff == 1'b0 ? 8'b0 : 8'd255;
+  assign red = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+  assign green = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+  assign blue = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+
 
   //three tmds_encoders (blue, green, red)
   tmds_encoder tmds_red(
