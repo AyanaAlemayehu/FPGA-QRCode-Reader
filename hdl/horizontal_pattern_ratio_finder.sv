@@ -18,13 +18,14 @@ module horizontal_pattern_ratio_finder
     typedef enum {BACKGROUND, BLACK_ONE_START, WHITE_ONE_START, BLACK_THREE, WHITE_ONE_END, BLACK_ONE_END, VALID_RATIO} ratio_state;
 
     logic old_pixel;
+    logic new_line;
     logic [8:0] index;
     logic [8:0] black, white;
     logic [8:0] x, y;
     logic [8:0] length;
     fsm_state state = RESET; // check here for errors
     ratio_state state_ratio = BACKGROUND;
-    assign pixel_address <= x + y*WIDTH;
+    assign pixel_address = x + y*WIDTH;
 
     always_ff @(posedge clk_in) begin
         if (rst_in) begin
