@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -134,8 +134,12 @@ module top_level(
             // averaging is when applying the sharpening kernel, it end when reciving a finishing signel from average module.
             // during this stage, the hdmi should show nothing, until the image is sharpened.
                         // if recived an end signal from average module, move to streaming2 state
-                        state <= average_finished == 1'b1 ? FINISHED : AVERAGING;
+                        state <= average_finished == 1'b1 ? HORIZ_PATTERNS : AVERAGING;
                     end 
+          HORIZ_PATTERNS: begin
+            // detecting the horizontal patterns
+                state <= BRAM_one_horizontal_data_valid == 1'b1 ? FINISHED : HORIZ_PATTERNS;
+          end
           endcase
       end
     end 
@@ -350,7 +354,22 @@ module top_level(
     .doutb(BRAM_one_reading_pixel)
   );
 
+  // pattern relatede variables
+  logic BRAM_one_horizontal_pixel_data;
+  logic [19:0] BRAM_one_horizontal_pixel_address;
+  logic [479:0] BRAM_one_horizontal_finder_encodings;
+  logic BRAM_one_horizontal_data_valid;
 
+  horizontal_pattern_ratio_finder horizontal
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .pixel_data(BRAM_one_horizontal_pixel_data),// MAKE NEW VARIABLE
+
+        .pixel_address(BRAM_one_horizontal_pixel_address),
+        .finder_encodings(BRAM_one_horizontal_finder_encodings),
+        .data_valid(BRAM_one_horizontal_data_valid)
+    );
 
   /*
     Controling Memory Ports
@@ -369,8 +388,13 @@ module top_level(
         buffer_averaging_pixel = frame_buffer_reading_pixel;
         frame_buffer_reading_enb = 1'b1;
       end
-
-      if (state == FINISHED) begin
+      else if (state == HORIZ_PATTERNS)begin
+        // reading frame buffer goes to horizontal pattern finder if state is HORIZ_PATTERNS
+        BRAM_one_reading_address = BRAM_one_horizontal_pixel_address;
+        BRAM_one_horizontal_pixel_data = BRAM_one_reading_pixel;
+        BRAM_one_reading_enb = 1'b1;
+      end
+      else if (state == FINISHED) begin
         // add switches to control what's on hdmi after this stage.
         // reading frame buffer goes to hdmi if state is streaming
         BRAM_one_reading_address = img_addr_rot;
@@ -392,6 +416,7 @@ module top_level(
     case ({sw[4], sw[3]})
       2'b00: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
       2'b01: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
+      2'b10: hdmi_out_raw_pixel = state == FINISHED ? (BRAM_one_horizontal_finder_encodings[vcount_scaled]) : 1'b0;
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end
