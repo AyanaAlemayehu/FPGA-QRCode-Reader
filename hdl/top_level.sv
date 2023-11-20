@@ -365,7 +365,7 @@ module top_level(
         .clk_in(clk_pixel),
         .rst_in(sys_rst),
         .pixel_data(BRAM_one_horizontal_pixel_data),// MAKE NEW VARIABLE
-
+        .start_finder(average_finished),
         .pixel_address(BRAM_one_horizontal_pixel_address),
         .finder_encodings(BRAM_one_horizontal_finder_encodings),
         .data_valid(BRAM_one_horizontal_data_valid)
