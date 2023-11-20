@@ -416,7 +416,7 @@ module top_level(
     case ({sw[4], sw[3]})
       2'b00: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
       2'b01: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
-      2'b10: hdmi_out_raw_pixel = state == FINISHED ? (BRAM_one_horizontal_finder_encodings[vcount_scaled]) : 1'b0;
+      2'b10: hdmi_out_raw_pixel = state == FINISHED ? (BRAM_one_horizontal_finder_encodings[hcount_scaled]) : 1'b0;
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end

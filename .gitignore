@@ -11,5 +11,5 @@ obj/
 dump/ #note i use dump to contain my log files
 
 #simulation files
-.out
-.vcd
+*.out
+*.vcd
