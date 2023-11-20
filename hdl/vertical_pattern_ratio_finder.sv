@@ -1,10 +1,10 @@
 `timescale 1ns / 1ps
 `default_nettype none
 // ONE IS BLACK ONLY IN DECODING
-module horizontal_pattern_ratio_finder
+module vertical_pattern_ratio_finder
     #(parameter WIDTH = 480,
       parameter HEIGHT = 480,
-      parameter ERROR = 1)// dont forget to change back if doesnt work
+      parameter ERROR = 1)
     (
         input wire clk_in,
         input wire rst_in,
@@ -23,17 +23,17 @@ module horizontal_pattern_ratio_finder
     logic new_line;
     logic [8:0] index;
     logic [8:0] black, white;
-    logic [8:0] x;
+    logic [8:0] y;
     logic [8:0] length;
     fsm_state state = RESET; // check here for errors
     ratio_state state_ratio = RESET2;
-    assign pixel_address = x + index*WIDTH;
+    assign pixel_address = index + y*WIDTH;
 
     always_ff @(posedge clk_in) begin
         if (rst_in) begin
             state <= RESET;
             index <= 9'b0;
-            x <= 9'b0;
+            y <= 9'b0;
             old_pixel <= 1'b0;
             new_line <= 1'b0;
             black <= 9'b1;
@@ -57,14 +57,14 @@ module horizontal_pattern_ratio_finder
                 DETERMINE: begin
                     old_pixel <= pixel_data;
                     // always increase x and or y
-                    if (x < WIDTH - 1) begin
-                        x <= x + 1;
+                    if (y < HEIGHT - 1) begin
+                        y <= y + 1;
                         state <= WAIT_ONE;
                     end
                     else begin
                         black <= 9'b1;
                         white <= 9'b1;
-                        x <= 0;
+                        y <= 0;
                         new_line <= 1'b1;
                         index <= index + 1;
                         if (index == HEIGHT - 1) begin

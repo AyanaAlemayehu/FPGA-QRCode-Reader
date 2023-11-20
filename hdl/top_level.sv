@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS,  FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -138,7 +138,11 @@ module top_level(
                     end 
           HORIZ_PATTERNS: begin
             // detecting the horizontal patterns
-                state <= BRAM_one_horizontal_data_valid == 1'b1 ? FINISHED : HORIZ_PATTERNS;
+                state <= BRAM_one_horizontal_data_valid == 1'b1 ? VERT_PATTERNS : HORIZ_PATTERNS;
+          end
+          VERT_PATTERNS: begin
+            // detecting the vertical patterns
+                state <= BRAM_one_vertical_data_valid == 1'b1 ? FINISHED : VERT_PATTERNS;
           end
           endcase
       end
@@ -371,6 +375,23 @@ module top_level(
         .data_valid(BRAM_one_horizontal_data_valid)
     );
 
+  logic BRAM_one_vertical_pixel_data;
+  logic [19:0] BRAM_one_vertical_pixel_address;
+  logic [479:0] BRAM_one_vertical_finder_encodings;
+  logic BRAM_one_vertical_data_valid;
+
+  vertical_pattern_ratio_finder vertical
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .pixel_data(BRAM_one_vertical_pixel_data),// MAKE NEW VARIABLE
+        .start_finder(BRAM_one_horizontal_data_valid),
+        .pixel_address(BRAM_one_vertical_pixel_address),
+        .finder_encodings(BRAM_one_vertical_finder_encodings),
+        .data_valid(BRAM_one_vertical_data_valid)
+    );
+
+
   /*
     Controling Memory Ports
   */
@@ -392,6 +413,11 @@ module top_level(
         // reading frame buffer goes to horizontal pattern finder if state is HORIZ_PATTERNS
         BRAM_one_reading_address = BRAM_one_horizontal_pixel_address;
         BRAM_one_horizontal_pixel_data = BRAM_one_reading_pixel;
+        BRAM_one_reading_enb = 1'b1;
+      end
+      else if (state == VERT_PATTERNS) begin
+        BRAM_one_reading_address = BRAM_one_vertical_pixel_address;
+        BRAM_one_vertical_pixel_data = BRAM_one_reading_pixel;
         BRAM_one_reading_enb = 1'b1;
       end
       else if (state == FINISHED) begin
@@ -416,7 +442,9 @@ module top_level(
     case ({sw[4], sw[3]})
       2'b00: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
       2'b01: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
-      2'b10: hdmi_out_raw_pixel = state == FINISHED ? (BRAM_one_horizontal_finder_encodings[hcount_scaled]) : 1'b0;
+      2'b10: hdmi_out_raw_pixel = (state == FINISHED) ? 
+                                  (BRAM_one_horizontal_finder_encodings[hcount_scaled]) &&
+                                  (BRAM_one_vertical_finder_encodings[STORED_WIDTH - vcount_scaled]) :  1'b0;
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end
