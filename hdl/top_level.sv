@@ -30,7 +30,7 @@ module top_level(
     --------------------------------------------------------------------
   */
 
-    assign led = sw; //for debugging
+    // assign led = sw; //for debugging
     assign rgb1= 0;  //shut up those rgb LEDs (active high):
     assign rgb0 = 0;
     //have btnd control system reset
@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CROSS,  FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, CROSS,  FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -119,12 +119,13 @@ module top_level(
           case (state)
           RESET: begin
                     state <= STREAMING1;
+                    led <= 16'b1;
                 end
 
           STREAMING1: begin
             // streaming1 is when taking picture, it ends when both capturing and starting_decoding switches are on.
             // during this stage, the pixels from frame buffer on hdmi
-
+                    led <= 16'b10;
                           if (sw[0] && sw[1]) begin
                             state <= AVERAGING;
                           end
@@ -134,20 +135,30 @@ module top_level(
             // averaging is when applying the sharpening kernel, it end when reciving a finishing signel from average module.
             // during this stage, the hdmi should show nothing, until the image is sharpened.
                         // if recived an end signal from average module, move to streaming2 state
+                        led <= 16'b100;
                         state <= average_finished == 1'b1 ? HORIZ_PATTERNS : AVERAGING;
                     end 
           HORIZ_PATTERNS: begin
+                led <= 16'b1000;
             // detecting the horizontal patterns
                 state <= BRAM_one_horizontal_data_valid == 1'b1 ? VERT_PATTERNS : HORIZ_PATTERNS;
           end
           VERT_PATTERNS: begin
+                led <= 16'b10000;
             // detecting the vertical patterns
                 state <= BRAM_one_vertical_data_valid == 1'b1 ? CROSS : VERT_PATTERNS;
           end
 
-          CROSS: begin
-                state <= (clean_horz_valid_saved && clean_vert_valid_saved)? FINISHED: CROSS;
+          CLEAN: begin
+                led <= 16'b100000;
+                state <= (clean_horz_valid_saved && clean_vert_valid_saved)? CROSS: CLEAN;
           end
+
+          CROSS: begin
+                led <= 16'b1000000;
+                state <= (cross_valid)? FINISHED: CROSS;
+          end
+
 
 
           endcase
@@ -438,6 +449,27 @@ module top_level(
     );
 
 
+  logic BRAM_one_cross_reading_pixel;
+  logic BRAM_one_cross_reading_address;
+  logic [8:0] centers_x_cross [2:0];
+  logic [8:0] centers_y_cross [2:0];
+  logic cross_valid;
+
+  cross_patterns cross_mod
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .horz_patterns(BRAM_one_horizontal_finder_encodings_clean),
+        .vert_patterns(BRAM_one_vertical_finder_encodings_clean),
+        .start_cross((clean_horz_valid_saved && clean_vert_valid_saved)),
+        .pixel_reading(BRAM_one_cross_reading_pixel),
+        .address_reading(BRAM_one_cross_reading_address),
+        .centers_x(centers_x_cross),
+        .centers_y(centers_y_cross),
+        .centers_valid(cross_valid)
+    );
+
+
   /*
     Controling Memory Ports
   */
@@ -466,6 +498,12 @@ module top_level(
         BRAM_one_vertical_pixel_data = BRAM_one_reading_pixel;
         BRAM_one_reading_enb = 1'b1;
       end
+      else if (state == CROSS) begin
+        BRAM_one_reading_address = BRAM_one_cross_reading_address;
+        BRAM_one_cross_reading_pixel = BRAM_one_reading_pixel;
+        BRAM_one_reading_enb = 1'b1;
+
+      end
       else if (state == FINISHED) begin
         // add switches to control what's on hdmi after this stage.
         // reading frame buffer goes to hdmi if state is streaming
@@ -485,15 +523,22 @@ module top_level(
 
   // Controling what goes on screen
   always_comb begin  //add switches
-    case ({sw[4], sw[3]})
-      2'b00: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
-      2'b01: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
-      2'b10: hdmi_out_raw_pixel = (state == FINISHED) ? 
+    case ({sw[5], sw[4], sw[3]})
+      3'b000: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
+      3'b001: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
+      3'b010: hdmi_out_raw_pixel = (state == FINISHED) ? 
                                   (BRAM_one_horizontal_finder_encodings[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings[STORED_WIDTH - vcount_scaled]) :  1'b0;
-      2'b11: hdmi_out_raw_pixel = (state == FINISHED) ?
+      3'b011: hdmi_out_raw_pixel = (state == FINISHED) ?
                                   (BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled]) :  1'b0;
+
+      3'b100: hdmi_out_raw_pixel = (state == FINISHED) ? (((hcount_scaled == centers_x_cross[0]) ||
+                                                          (hcount_scaled == centers_x_cross[1]) ||
+                                                          (hcount_scaled == centers_x_cross[2])) &&
+                                                          (((STORED_WIDTH - vcount_scaled) == centers_y_cross[0]) ||
+                                                          ((STORED_WIDTH - vcount_scaled) == centers_y_cross[1]) ||
+                                                          ((STORED_WIDTH - vcount_scaled) == centers_y_cross[2]))) : 1'b0;
 
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
