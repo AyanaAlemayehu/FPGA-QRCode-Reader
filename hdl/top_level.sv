@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS,  FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CROSS,  FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -142,8 +142,14 @@ module top_level(
           end
           VERT_PATTERNS: begin
             // detecting the vertical patterns
-                state <= BRAM_one_vertical_data_valid == 1'b1 ? FINISHED : VERT_PATTERNS;
+                state <= BRAM_one_vertical_data_valid == 1'b1 ? CROSS : VERT_PATTERNS;
           end
+
+          CROSS: begin
+                state <= (clean_horz_valid_saved && clean_vert_valid_saved)? FINISHED: CROSS;
+          end
+
+
           endcase
       end
     end 
@@ -391,6 +397,46 @@ module top_level(
         .data_valid(BRAM_one_vertical_data_valid)
     );
 
+    logic clean_horz_valid;
+    logic clean_vert_valid;
+    logic clean_horz_valid_saved;
+    logic clean_vert_valid_saved;
+
+    always_ff @(posedge clk_pixel) begin
+      if (clean_horz_valid)
+      clean_horz_valid_saved <=1'b1;
+
+      if (clean_vert_valid)
+      clean_vert_valid_saved <=1'b1;
+
+    end
+
+    logic [479:0] BRAM_one_vertical_finder_encodings_clean;
+    logic [479:0] BRAM_one_horizontal_finder_encodings_clean;
+
+
+    clean_patterns #(.WIDTH(480))
+    clean_horz
+    (   
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .pattern(BRAM_one_horizontal_finder_encodings),
+        .start_cleaning(BRAM_one_horizontal_data_valid),
+        .data_valid(clean_horz_valid),
+        .clean_pattern(BRAM_one_horizontal_finder_encodings_clean)
+    );
+
+    clean_patterns #(.WIDTH(480))
+    clean_vert
+    (   
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .pattern(BRAM_one_vertical_finder_encodings),
+        .start_cleaning(BRAM_one_vertical_data_valid),
+        .data_valid(clean_vert_valid),
+        .clean_pattern(BRAM_one_vertical_finder_encodings_clean)
+    );
+
 
   /*
     Controling Memory Ports
@@ -445,6 +491,10 @@ module top_level(
       2'b10: hdmi_out_raw_pixel = (state == FINISHED) ? 
                                   (BRAM_one_horizontal_finder_encodings[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings[STORED_WIDTH - vcount_scaled]) :  1'b0;
+      2'b11: hdmi_out_raw_pixel = (state == FINISHED) ?
+                                  (BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
+                                  (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled]) :  1'b0;
+
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end

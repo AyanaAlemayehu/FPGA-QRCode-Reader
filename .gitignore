@@ -9,7 +9,11 @@
 .Xil/
 obj/
 dump/ #note i use dump to contain my log files
+remote/
 
 #simulation files
 *.out
 *.vcd
+
+#MAC
+.DS_Store
