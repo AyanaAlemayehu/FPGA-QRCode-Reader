@@ -130,7 +130,7 @@ module cross_patterns #(parameter HEIGHT = 480,
                         else begin
                             x_read <= 9'b0;
                             if (box_min_y + y_read < box_max_y) begin
-                                y_read <= y_read +1;
+                                y_read <= y_read + 1;
                             end 
                             else begin
                                 state <= CALCULATE;
@@ -155,7 +155,7 @@ module cross_patterns #(parameter HEIGHT = 480,
                         else begin
                             x_read <= 9'b0;
                             if (box_min_y + y_read < box_max_y) begin
-                                y_read <= y_read +1;
+                                y_read <= y_read + 1;
                             end
                             else begin
                                 state <= CALCULATE;
@@ -167,12 +167,12 @@ module cross_patterns #(parameter HEIGHT = 480,
                 CALCULATE: begin   
                     // RUNS ONCE A ZONE COMPLETES THIS RUNS
                     // return a center if a valid answer if non-zero majority black.
-                    if (zone_x < 2'b11) begin
+                    if (zone_x < 2'b10) begin
                         zone_x <= zone_x + 1;
                     end
                     else begin
                         zone_x <= 2'b0;
-                        if (zone_y < 2'b11) begin
+                        if (zone_y < 2'b10) begin
                             zone_y <= zone_y + 1;                            
                         end
                         else begin
@@ -192,13 +192,16 @@ module cross_patterns #(parameter HEIGHT = 480,
                             state <= PENDING;
                         end
                         if (counter_black > (counter_white + counter_black) - (counter_white + counter_black)>>2) begin 
+                            // SOMETHING IS WRONG HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                            //-------------------------------------------------------------------------------------
                             // currently requires more than 75% of all pixels to be black when doing lookup
                             //// a valid answer, return center
                             center_index <= center_index + 2'b01;
-                            // centers_x[center_index] <= start_x >> 1 + end_x >> 1 + box_min_x;
-                            // centers_y[center_index] <= start_y >> 1 + end_y >> 1 + box_min_y;
-                            centers_x[center_index] <= start_x + box_min_x + center_index*10;
-                            centers_y[center_index] <= start_y + box_min_y;
+                            // centers_x[center_index] <= (start_x >> 1 + end_x >> 1 + box_min_x);
+                            // centers_y[center_index] <= (start_y >> 1 + end_y >> 1 + box_min_y);
+                            centers_x[center_index] <= (start_x + box_min_x);
+                            centers_y[center_index] <= (start_y + box_min_y + center_index*10);
+                            //-------------------------------------------------------------------------------------
                         end
                 end
 

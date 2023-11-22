@@ -576,13 +576,10 @@ module top_level(
                                                          ((BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled])): 1'b0;
 
-      3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? (((hcount_scaled == centers_x_cross[0]) ||
-                                                          (hcount_scaled == centers_x_cross[1]) ||
-                                                          (hcount_scaled == centers_x_cross[2])) &&
-                                                          (((STORED_WIDTH - vcount_scaled) == centers_y_cross[0]) ||
-                                                          ((STORED_WIDTH - vcount_scaled) == centers_y_cross[1]) ||
-                                                          ((STORED_WIDTH - vcount_scaled) == centers_y_cross[2]))) : 1'b0;
-
+      3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? ((hcount_scaled == centers_x_cross[0]) && (STORED_WIDTH - vcount_scaled == centers_y_cross[0])) ||
+                                                         ((hcount_scaled == centers_x_cross[1]) && (STORED_WIDTH - vcount_scaled == centers_y_cross[1])) ||
+                                                         ((hcount_scaled == centers_x_cross[2]) && (STORED_WIDTH - vcount_scaled == centers_y_cross[2])) : 1'b0;
+    
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end
