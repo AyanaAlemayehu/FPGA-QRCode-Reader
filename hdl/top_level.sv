@@ -32,7 +32,7 @@ module top_level(
 
     // assign led = sw; //for debugging
     assign rgb1= 0;  //shut up those rgb LEDs (active high):
-    assign rgb0 = 0;
+    // assign rgb0 = 0;
     //have btnd control system reset
     logic sys_rst;
     assign sys_rst = btn[0];
@@ -501,7 +501,8 @@ module top_level(
         .address_reading(BRAM_one_cross_reading_address),
         .centers_x(centers_x_cross),
         .centers_y(centers_y_cross),
-        .centers_valid(cross_valid)
+        .centers_valid(cross_valid),
+        .centers_not_found_error(rgb0[0])// using rgb to err out
     );
 
 

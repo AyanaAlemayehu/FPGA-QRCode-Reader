@@ -14,7 +14,8 @@ module cross_patterns #(parameter HEIGHT = 480,
         output logic [19:0] address_reading,
         output logic [8:0] centers_x [2:0],
         output logic [8:0] centers_y [2:0],
-        output logic centers_valid
+        output logic centers_valid,
+        output logic centers_not_found_error
     );
 
 
@@ -84,6 +85,10 @@ module cross_patterns #(parameter HEIGHT = 480,
     always_ff @(posedge clk_in) begin
 
         if (rst_in) begin
+            start_x <= 9'b0;
+            start_y <= 9'b0;
+            end_x <= 9'b0;
+            end_y <= 9'b0;
             zone_y <= 2'b0;
             zone_x <= 2'b0;
             x_read <= 9'b0;
@@ -94,6 +99,7 @@ module cross_patterns #(parameter HEIGHT = 480,
             loaded <= 1'b0;
             center_index <= 2'b0;
             centers_valid <= 1'b0;
+            centers_not_found_error <= 1'b0;
         end
 
         else begin
@@ -106,7 +112,7 @@ module cross_patterns #(parameter HEIGHT = 480,
 
                 PENDING: begin // check if need to lookup
 
-                    if (horz_patterns[box_min_x + x_read] && vert_patterns[box_min_y+y_read]) begin
+                    if (horz_patterns[box_min_x + x_read] && vert_patterns[box_min_y + y_read]) begin
                         state <= WAIT_ONE;
                         end_x <= x_read;
                         end_y <= y_read;
@@ -158,12 +164,29 @@ module cross_patterns #(parameter HEIGHT = 480,
 
                 end
 
-                CALCULATE: begin   // return a center if a valid answer if non-zero majority black.
+                CALCULATE: begin   
+                    // RUNS ONCE A ZONE COMPLETES THIS RUNS
+                    // return a center if a valid answer if non-zero majority black.
+                    if (zone_x < 2'b11) begin
+                        zone_x <= zone_x + 1;
+                    end
+                    else begin
+                        zone_x <= 2'b0;
+                        if (zone_y < 2'b11) begin
+                            zone_y <= zone_y + 1;                            
+                        end
+                        else begin
+                            state <= FINISHED;
+                            centers_not_found_error <= 1'b1;
+                        end
+                    end
                     loaded <= 1'b0;
                         if (center_index == 2) begin
                             state <= FINISHED;
                             centers_valid <= 1'b1;
                         end else begin
+                            counter_black <= 14'b0;
+                            counter_white <= 14'b0;
                             y_read <= 9'b0;
                             x_read <= 9'b0;// might be unecessary
                             state <= PENDING;
@@ -171,9 +194,11 @@ module cross_patterns #(parameter HEIGHT = 480,
                         if (counter_black > (counter_white + counter_black) - (counter_white + counter_black)>>2) begin 
                             // currently requires more than 75% of all pixels to be black when doing lookup
                             //// a valid answer, return center
-                            center_index <= center_index + 1;
-                            centers_x[center_index] <= start_x >> 1 + end_x >> 1 + box_min_x;
-                            centers_y[center_index] <= start_y >> 1+ end_y >> 1 + box_min_y;
+                            center_index <= center_index + 2'b01;
+                            // centers_x[center_index] <= start_x >> 1 + end_x >> 1 + box_min_x;
+                            // centers_y[center_index] <= start_y >> 1 + end_y >> 1 + box_min_y;
+                            centers_x[center_index] <= start_x + box_min_x + center_index*10;
+                            centers_y[center_index] <= start_y + box_min_y;
                         end
                 end
 
