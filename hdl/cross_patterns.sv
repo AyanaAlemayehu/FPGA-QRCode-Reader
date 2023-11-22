@@ -148,20 +148,20 @@ module cross_patterns #(parameter HEIGHT = 480,
                     end else begin
                         counter_black <= counter_black + 1;
                     end
-
                     if (box_min_x + x_read < box_max_x) begin
                             x_read <= x_read +1;
+                            state <= PENDING;
                         end 
                         else begin
                             x_read <= 9'b0;
                             if (box_min_y + y_read < box_max_y) begin
                                 y_read <= y_read + 1;
+                                state <= PENDING;
                             end
                             else begin
                                 state <= CALCULATE;
                             end
                         end 
-
                 end
 
                 CALCULATE: begin   
@@ -197,10 +197,11 @@ module cross_patterns #(parameter HEIGHT = 480,
                             // currently requires more than 75% of all pixels to be black when doing lookup
                             //// a valid answer, return center
                             center_index <= center_index + 2'b01;
-                            // centers_x[center_index] <= (start_x >> 1 + end_x >> 1 + box_min_x);
-                            // centers_y[center_index] <= (start_y >> 1 + end_y >> 1 + box_min_y);
-                            centers_x[center_index] <= (start_x + box_min_x);
-                            centers_y[center_index] <= (start_y + box_min_y + center_index*10);
+
+                            centers_x[center_index] <= end_x;
+                            centers_y[center_index] <= end_y;
+                            // centers_x[center_index] <= (start_x + box_min_x);
+                            // centers_y[center_index] <= (start_y + box_min_y + center_index*10);
                             //-------------------------------------------------------------------------------------
                         end
                 end
