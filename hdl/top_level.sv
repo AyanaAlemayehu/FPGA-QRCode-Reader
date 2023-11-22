@@ -31,7 +31,7 @@ module top_level(
   */
 
     // assign led = sw; //for debugging
-    assign rgb1= 0;  //shut up those rgb LEDs (active high):
+    // assign rgb1= 0;  //shut up those rgb LEDs (active high):
     // assign rgb0 = 0;
     //have btnd control system reset
     logic sys_rst;
@@ -165,7 +165,12 @@ module top_level(
           end
 
           FINISHED: begin
-                led <= centers_x_cross[0];
+                case ({sw[7], sw[6]})
+                2'b00: led <= counter_black_s[0];
+                2'b01: led <= counter_white_s[0];
+                2'b10: led <= counter_black_s[1];
+                2'b11: led <= counter_white_s[1];
+                endcase
           end
 
 
@@ -486,6 +491,8 @@ module top_level(
   logic [8:0] centers_x_cross [2:0];
   logic [8:0] centers_y_cross [2:0];
   logic cross_valid;
+  logic [19:0] counter_black_s [2:0];
+  logic [19:0] counter_white_s [2:0];
 
   cross_patterns_new cross_mod
     (
@@ -502,7 +509,10 @@ module top_level(
         .centers_x(centers_x_cross),
         .centers_y(centers_y_cross),
         .centers_valid(cross_valid),
-        .centers_not_found_error(rgb0[0])// using rgb to err out
+        .centers_not_found_error(rgb0[0]),// using rgb to err out
+        .centers_not_found_error2(rgb0[1]),
+        .counter_black_s(counter_black_s),
+        .counter_white_s(counter_white_s)
     );
 
 

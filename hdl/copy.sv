@@ -2,7 +2,7 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module cross_patterns_new #(parameter HEIGHT = 480,
+module cross_patterns_copy #(parameter HEIGHT = 480,
                             parameter WIDTH = 480)
     (
         input wire clk_in,
@@ -19,9 +19,7 @@ module cross_patterns_new #(parameter HEIGHT = 480,
         output logic [8:0] centers_y [2:0],
         output logic centers_valid,
         output logic centers_not_found_error,
-        output logic centers_not_found_error2,
-        output logic [19:0] counter_black_s [2:0],
-        output logic [19:0] counter_white_s [2:0]
+        output logic centers_not_found_error2
     );
 
 
@@ -213,23 +211,21 @@ module cross_patterns_new #(parameter HEIGHT = 480,
                         // but still running through the last one yet, may find something
 
                         if (center_index > 2'b11) begin     ///EDIT
-                            centers_not_found_error <= 1'b1;    //red you have more than 3 centers detected
-                        end else if (center_index < 2'b11) begin   
-                            centers_not_found_error2 <= 1'b1;   //green you have less than 3 centers detected
+                            centers_not_found_error <= 1'b1;
+                        end else if (center_index < 2'b11) begin
+                            centers_not_found_error2 <= 1'b1;
                         end
                     end
                 end
 
                 // add center of current box if majority is black
-                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>1) - ((counter_white + counter_black)>>3)) ) begin
+                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>1) + ((counter_white + counter_black)>>3)) ) begin
                         ///EDIT removed the if
                         center_index <= center_index + 1;
                         // POTENTIAL ERROR: SYSTEM VERILOG CAN OVERFLOW IN THE MIDDLE OF ADDITOIN, SO OFFSET WITH 1'b0
                         
                         centers_x[center_index] <= (({1'b0, x_start} + {1'b0, x_end})>>1) + box_min_x; 
                         centers_y[center_index] <= (({1'b0, y_start} + {1'b0, y_end})>>1) + box_min_y;
-                        counter_black_s[center_index] <= counter_black;
-                        counter_white_s[center_index] <= counter_white;
 
                 end 
             end 
