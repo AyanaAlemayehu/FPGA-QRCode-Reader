@@ -487,7 +487,7 @@ module top_level(
   logic [8:0] centers_y_cross [2:0];
   logic cross_valid;
 
-  cross_patterns cross_mod
+  cross_patterns_new cross_mod
     (
         .clk_in(clk_pixel),
         .rst_in(sys_rst),
