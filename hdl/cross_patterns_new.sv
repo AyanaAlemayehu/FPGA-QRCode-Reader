@@ -1,3 +1,7 @@
+// ERROR: NEVER FORGET DEFAULT NETTYPE
+`timescale 1ns / 1ps
+`default_nettype none
+
 module cross_patterns_new #(parameter HEIGHT = 480,
                         parameter WIDTH = 480)
     (
@@ -14,7 +18,11 @@ module cross_patterns_new #(parameter HEIGHT = 480,
         output logic [8:0] centers_x [2:0],
         output logic [8:0] centers_y [2:0],
         output logic centers_valid,
-        output logic centers_not_found_error
+        output logic centers_not_found_error,
+
+        // debugging
+        output logic [19:0] counter_blacks [2:0],
+        output logic [19:0] counter_whites [2:0]
     );
 
 
@@ -22,55 +30,56 @@ module cross_patterns_new #(parameter HEIGHT = 480,
     fsm_state state = RESET;
 
     logic [8:0] x_read, y_read;  // current coordinates checking pixel at, reset to zero at rst_in and whenever we switch box
-    assign reading_address = x_read + y_read * WIDTH;
+    // ERROR: FORGOT TO OFFSET READING ADDRESS ANDDDDDDD THIS WAS CALLED READING_ADDRESS (WRONG NAME)
+    assign address_reading = box_min_x + x_read + (y_read + box_min_y) * WIDTH;
     
     logic [8:0] box_min_x, box_min_y, box_max_x, box_max_y; // current box boundries, changes whenever we switch zone.
     logic [1:0] zone_x, zone_y;
 
+    
+    // perhaps switching to an always_ff will fix this
+    // SIKE ONE CYCLE LATE BREAKS STUFF?
     always_comb begin
-        // assign box boundries depending on the zone
         case (zone_x)
-        2'b00: begin
-            box_min_x = 8'b0;
-            box_max_x = bound_x[0];
-        end 
-        2'b01: begin
-            box_min_x = bound_x[0];
-            box_max_x = bound_x[1];
-        end 
-        2'b10: begin
-            box_min_x = bound_x[1];
-            box_max_x = WIDTH-1;
-        end 
-        default: begin 
-            box_min_x = 0;
-            box_max_x = WIDTH-1;
-        end
+            2'b00: begin
+                box_min_x = 8'b0;
+                box_max_x = bound_x[0];
+            end 
+            2'b01: begin
+                box_min_x = bound_x[0];
+                box_max_x = bound_x[1];
+            end 
+            2'b10: begin
+                box_min_x = bound_x[1];
+                box_max_x = WIDTH-1;
+            end 
+            default: begin 
+                box_min_x = 120;
+                box_max_x = 360;
+            end
         endcase
-
         case (zone_y)
-        2'b00: begin
-            box_min_y = 8'b0;
-            box_max_y = bound_y[0];
-        end 
-        2'b01: begin
-            box_min_y = bound_y[0];
-            box_max_y = bound_y[1];
-        end 
-        2'b10: begin
-            box_min_y = bound_y[1];
-            box_max_y = HEIGHT-1;
-        end 
-        default: begin 
-            box_min_y = 0;
-            box_max_y = HEIGHT-1;
-        end
+            2'b00: begin
+                box_min_y = 8'b0;
+                box_max_y = bound_y[0];
+            end 
+            2'b01: begin
+                box_min_y = bound_y[0];
+                box_max_y = bound_y[1];
+            end 
+            2'b10: begin
+                box_min_y = bound_y[1];
+                box_max_y = HEIGHT-1;
+            end 
+            default: begin 
+                box_min_y = 120;
+                box_max_y = 360;
+            end
         endcase
     end
 
-
-    logic [13:0] counter_black;
-    logic [13:0] counter_white;
+    logic [19:0] counter_black;
+    logic [19:0] counter_white;
     logic [1:0] center_index;
     logic [8:0] x_start, y_start, x_end, y_end;
     logic first_white;
@@ -85,8 +94,8 @@ module cross_patterns_new #(parameter HEIGHT = 480,
             y_start <= 9'b0;
             x_end <= 9'b0;
             y_end <= 9'b0;
-            counter_black <= 14'b0;
-            counter_white <= 14'b0;
+            counter_black <= 20'b0; // POTENTIAL ERROR: OVERFLOW IN INTERMEDIATE ADDITON?
+            counter_white <= 20'b0;
             zone_x <= 2'b00;
             zone_y <= 2'b00;
             center_index <= 2'b0;
@@ -134,7 +143,7 @@ module cross_patterns_new #(parameter HEIGHT = 480,
                             y_read <= y_read + 9'b1;
                         end else begin
                             // end of box
-                            y_read <=0;
+                            y_read <= 9'b0;
                             state <= CALCULATE;
                         end
                     end
@@ -167,7 +176,7 @@ module cross_patterns_new #(parameter HEIGHT = 480,
                             state <= PENDING;
                         end else begin
                             // end of box
-                            y_read <=0;
+                            y_read <= 9'b0;
                             state <= CALCULATE;
                         end
                     end
@@ -178,8 +187,8 @@ module cross_patterns_new #(parameter HEIGHT = 480,
                 // 1- our first white again is going to be the first white
                 first_white <= 1'b1;
                 // 2- reset counters:
-                counter_black <= 14'b0;
-                counter_white <= 14'b0; 
+                counter_black <= 20'b0;
+                counter_white <= 20'b0; 
                 // 3- reset coords, already done when moved to this state, but keep anyways
                 x_read <= 9'b0;
                 y_read <= 9'b0;
@@ -190,36 +199,33 @@ module cross_patterns_new #(parameter HEIGHT = 480,
                 // 4- change zone:
                 if (zone_x < 2'b10) begin
                     zone_x <= zone_x + 1;
+                    state <= PENDING;
                 end else begin
                     zone_x <= 2'b00;
                     if (zone_y < 2'b10) begin
+                        state <= PENDING;
                         zone_y <= zone_y + 1;
                     end else begin
                         // already looked all boxes and not break, return error
                         zone_y <= 2'b00;
-                        state <= FINISHED;
+                        state <= FINISHED;// POTENTIAL ERROR: MANIPULATING STATE TWICE??? (heavily modified it to stop that now)
                         // but still running through the last one yet, may find something
-                        if (!(counter_black > (counter_white + counter_black) - (counter_white + counter_black)>>2)) begin
+                        if (!(center_index > 2'b10)) begin // if we didn't find three
+                            centers_valid <= 1'b1;// for the sake of debugging, SORTA ERROR
                             centers_not_found_error <= 1'b1; 
                         end 
                     end
                 end
 
                 // add center of current box if majority is black
-                if ((counter_black > (counter_white + counter_black) - (counter_white + counter_black)>>2)) begin
-                    center_index <= center_index + 1;
-                    centers_x[center_index] <= ((x_start + x_end)>>1 + box_min_x);
-                    centers_y[center_index] <= ((y_start + y_end)>>1 + box_min_y);
-
+                if ((counter_black > (counter_white + counter_black) - ((counter_white + counter_black)>>2))) begin
                     if (center_index < 2'b10) begin
-                        state <= PENDING; // go to check other boxes again
-                    end else begin
-                        state <= FINISHED; // you found three centers, hoho go to finished.
-                        centers_valid <= 1'b1;
-                    end 
-                end else begin
-                    state <= PENDING; // go to check other boxes again
-                end
+                        center_index <= center_index + 1;
+                        // POTENTIAL ERROR: SYSTEM VERILOG CAN OVERFLOW IN THE MIDDLE OF ADDITOIN, SO OFFSET WITH 1'b0
+                        centers_x[center_index] <= (({1'b0, x_start} + {1'b0, x_end})>>1) + box_min_x; 
+                        centers_y[center_index] <= (({1'b0, y_start} + {1'b0, y_end})>>1) + box_min_y;
+                    end
+                end 
             end 
 
             FINISHED: begin
@@ -232,3 +238,8 @@ module cross_patterns_new #(parameter HEIGHT = 480,
     end
 
 endmodule
+
+`default_nettype wire
+
+
+// DEBUGGING IDEA: READ counter_black and counter_white 

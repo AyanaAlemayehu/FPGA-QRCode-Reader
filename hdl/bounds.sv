@@ -1,6 +1,6 @@
 
-// `timescale 1ns / 1ps
-// `default_nettype none
+`timescale 1ns / 1ps
+`default_nettype none
 
 module bounds #(parameter HEIGHT = 480,
                 parameter WIDTH = 480,
@@ -102,4 +102,4 @@ module bounds #(parameter HEIGHT = 480,
 
 endmodule
 
-// `default_nettype wire
+`default_nettype wire

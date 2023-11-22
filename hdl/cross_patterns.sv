@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+`default_nettype none
 
 module cross_patterns #(parameter HEIGHT = 480,
                         parameter WIDTH = 480)
@@ -125,7 +127,7 @@ module cross_patterns #(parameter HEIGHT = 480,
 
                     else begin   // in case you got black
                         if (box_min_x + x_read < box_max_x) begin
-                            x_read <= x_read +1;
+                            x_read <= x_read + 1;
                         end 
                         else begin
                             x_read <= 9'b0;
@@ -149,7 +151,7 @@ module cross_patterns #(parameter HEIGHT = 480,
                         counter_black <= counter_black + 1;
                     end
                     if (box_min_x + x_read < box_max_x) begin
-                            x_read <= x_read +1;
+                            x_read <= x_read + 1;
                             state <= PENDING;
                         end 
                         else begin
@@ -198,8 +200,8 @@ module cross_patterns #(parameter HEIGHT = 480,
                             //// a valid answer, return center
                             center_index <= center_index + 2'b01;
 
-                            centers_x[center_index] <= end_x;
-                            centers_y[center_index] <= end_y;
+                            centers_x[center_index] <= box_min_x;
+                            centers_y[center_index] <= box_min_y;
                             // centers_x[center_index] <= (start_x + box_min_x);
                             // centers_y[center_index] <= (start_y + box_min_y + center_index*10);
                             //-------------------------------------------------------------------------------------
@@ -211,3 +213,5 @@ module cross_patterns #(parameter HEIGHT = 480,
         end
     end
 endmodule
+
+`default_nettype wire

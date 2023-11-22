@@ -1,3 +1,6 @@
+`timescale 1ns / 1ps
+`default_nettype none
+
 module clean_patterns #(parameter WIDTH = 480)
     (   
         input wire clk_in,
@@ -99,4 +102,4 @@ module clean_patterns #(parameter WIDTH = 480)
 
 endmodule
 
-
+`default_nettype wire
