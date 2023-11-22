@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, CROSS,  FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS,  FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -146,19 +146,27 @@ module top_level(
           VERT_PATTERNS: begin
                 led <= 16'b10000;
             // detecting the vertical patterns
-                state <= BRAM_one_vertical_data_valid == 1'b1 ? CROSS : VERT_PATTERNS;
+                state <= BRAM_one_vertical_data_valid == 1'b1 ? CLEAN : VERT_PATTERNS;
           end
 
           CLEAN: begin
                 led <= 16'b100000;
-                state <= (clean_horz_valid_saved && clean_vert_valid_saved)? CROSS: CLEAN;
+                state <= (clean_horz_valid_saved && clean_vert_valid_saved)? BOUNDS: CLEAN;
+          end
+
+          BOUNDS: begin
+              led <= 16'b1000000;
+              state <= (valid_bound) ? CROSS : BOUNDS;
           end
 
           CROSS: begin
-                led <= 16'b1000000;
+                led <= 16'b10000000;
                 state <= (cross_valid)? FINISHED: CROSS;
           end
 
+          FINISHED: begin
+                led <= centers_x_cross[0];
+          end
 
 
           endcase
@@ -414,19 +422,24 @@ module top_level(
     logic clean_vert_valid_saved;
 
     always_ff @(posedge clk_pixel) begin
-      if (clean_horz_valid)
-      clean_horz_valid_saved <=1'b1;
+      if (sys_rst) begin
+          clean_horz_valid_saved <= 1'b0;
+          clean_vert_valid_saved <= 1'b0;
+      end
+      else begin
+        if (clean_horz_valid)
+          clean_horz_valid_saved <=1'b1;
 
-      if (clean_vert_valid)
-      clean_vert_valid_saved <=1'b1;
-
+        if (clean_vert_valid)
+          clean_vert_valid_saved <=1'b1;
+      end
     end
 
     logic [479:0] BRAM_one_vertical_finder_encodings_clean;
     logic [479:0] BRAM_one_horizontal_finder_encodings_clean;
 
 
-    clean_patterns #(.WIDTH(480))
+    clean_patterns #(.WIDTH(STORED_WIDTH))
     clean_horz
     (   
         .clk_in(clk_pixel),
@@ -437,7 +450,7 @@ module top_level(
         .clean_pattern(BRAM_one_horizontal_finder_encodings_clean)
     );
 
-    clean_patterns #(.WIDTH(480))
+    clean_patterns #(.WIDTH(STORED_WIDTH))
     clean_vert
     (   
         .clk_in(clk_pixel),
@@ -448,9 +461,28 @@ module top_level(
         .clean_pattern(BRAM_one_vertical_finder_encodings_clean)
     );
 
+    logic [8:0] bounds_x [1:0];
+    logic [8:0] bounds_y [1:0];
+    logic valid_bound;
+
+    bounds #(.WIDTH(STORED_WIDTH), .HEIGHT(STORED_HEIGHT),
+             .OFFSET(10))
+    bounds_mod
+    (
+      .clk_in(clk_pixel),
+      .rst_in(sys_rst),
+      .horz_patterns(BRAM_one_horizontal_finder_encodings_clean),
+      .vert_patterns(BRAM_one_vertical_finder_encodings_clean),
+      .start_bound(clean_horz_valid_saved && clean_vert_valid_saved),
+
+      .bound_x(bounds_x),
+      .bound_y(bounds_y),
+      .valid_bound(valid_bound)
+    );
+
 
   logic BRAM_one_cross_reading_pixel;
-  logic BRAM_one_cross_reading_address;
+  logic [19:0] BRAM_one_cross_reading_address;
   logic [8:0] centers_x_cross [2:0];
   logic [8:0] centers_y_cross [2:0];
   logic cross_valid;
@@ -461,8 +493,11 @@ module top_level(
         .rst_in(sys_rst),
         .horz_patterns(BRAM_one_horizontal_finder_encodings_clean),
         .vert_patterns(BRAM_one_vertical_finder_encodings_clean),
-        .start_cross((clean_horz_valid_saved && clean_vert_valid_saved)),
+        .start_cross(valid_bound),
         .pixel_reading(BRAM_one_cross_reading_pixel),
+        .bound_x(bounds_x),
+        .bound_y(bounds_y),
+
         .address_reading(BRAM_one_cross_reading_address),
         .centers_x(centers_x_cross),
         .centers_y(centers_y_cross),
@@ -533,7 +568,14 @@ module top_level(
                                   (BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled]) :  1'b0;
 
-      3'b100: hdmi_out_raw_pixel = (state == FINISHED) ? (((hcount_scaled == centers_x_cross[0]) ||
+      3'b100: hdmi_out_raw_pixel = (state == FINISHED) ? ((hcount_scaled == bounds_x[0]) ||
+                                                         (hcount_scaled == bounds_x[1])) ||
+                                                         ((STORED_WIDTH - vcount_scaled == bounds_y[0]) ||
+                                                         (STORED_WIDTH - vcount_scaled == bounds_y[1])) ||
+                                                         ((BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
+                                  (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled])): 1'b0;
+
+      3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? (((hcount_scaled == centers_x_cross[0]) ||
                                                           (hcount_scaled == centers_x_cross[1]) ||
                                                           (hcount_scaled == centers_x_cross[2])) &&
                                                           (((STORED_WIDTH - vcount_scaled) == centers_y_cross[0]) ||
