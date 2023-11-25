@@ -2,34 +2,67 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module cross_patterns_copy #(parameter HEIGHT = 480,
-                            parameter WIDTH = 480)
+`ifdef SYNTHESIS
+`define FPATH(X) `"X`"
+`else /* ! SYNTHESIS */
+`define FPATH(X) `"data/X`"
+`endif  /* ! SYNTHESIS */
+
+module cross_patterns_testing_variant #(parameter HEIGHT = 480,
+                                        parameter WIDTH = 480)
     (
         input wire clk_in,
         input wire rst_in,
         input wire [479:0] horz_patterns,
         input wire [479:0] vert_patterns,
         input wire start_cross,
-        input wire pixel_reading,
         input wire [8:0] bound_x [1:0],
         input wire [8:0] bound_y [1:0],
 
-        output logic [19:0] address_reading,
         output logic [8:0] centers_x [2:0],
         output logic [8:0] centers_y [2:0],
         output logic centers_valid,
         output logic centers_not_found_error,
-        output logic centers_not_found_error2
+        output logic centers_not_found_error2,
+        output logic [19:0] counter_black_s [2:0],
+        output logic [19:0] counter_white_s [2:0]
     );
 
+    // interacting with below BRAM
+    logic pixel_reading;
+    logic [19:0] address_reading;
+
+    xilinx_single_port_ram_read_first #(
+    .RAM_WIDTH(1),                       // Specify RAM data width
+    .RAM_DEPTH(HEIGHT*WIDTH),                     // Specify RAM depth (number of entries)
+    .RAM_PERFORMANCE("HIGH_PERFORMANCE"), // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
+    .INIT_FILE(`FPATH(code.mem))          // Specify name/location of RAM initialization file if using one (leave blank if not)
+  ) your_instance_name (
+    .addra(address_reading),     // Address bus, width determined from RAM_DEPTH
+    .dina(0),       // RAM input data, width determined from RAM_WIDTH
+    .clka(clk_in),       // Clock
+    .wea(0),         // Write enable
+    .ena(1),         // RAM Enable, for additional power savings, disable port when not in use
+    .rsta(rst_in),       // Output reset (does not affect memory contents)
+    .regcea(1),   // Output register enable
+    .douta(pixel_reading)      // RAM output data, width determined from RAM_WIDTH
+  );
+
+
+//--------------------------------------------------------------------------------------------------------------------------------
+// everything below should be transferable
 
     typedef enum {RESET, PENDING, WAIT_ONE, WAIT_TWO, DETERMINE,CALCULATE, FINISHED} fsm_state;
     fsm_state state = RESET;
 
     logic [8:0] x_read, y_read;  // current coordinates checking pixel at, reset to zero at rst_in and whenever we switch box
     // ERROR: FORGOT TO OFFSET READING ADDRESS ANDDDDDDD THIS WAS CALLED READING_ADDRESS (WRONG NAME)
-    assign address_reading = box_min_x + x_read + (y_read + box_min_y) * WIDTH;
+    // triggers used for debugging
+    logic lookup_trigger, match_trigger;
+    assign lookup_trigger = horz_patterns[box_min_x + x_read] && vert_patterns[box_min_y + y_read];
+    assign match_trigger =  counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>1) - ((counter_white + counter_black)>>3));
     
+    assign address_reading = box_min_x + x_read + (y_read + box_min_y) * WIDTH;
     logic [8:0] box_min_x, box_min_y, box_max_x, box_max_y; // current box boundries, changes whenever we switch zone.
     logic [1:0] zone_x, zone_y;
 
@@ -120,7 +153,7 @@ module cross_patterns_copy #(parameter HEIGHT = 480,
             PENDING: begin
                 // check if pixel is white to see if need to read it's value.
                 // if pixel is white go to wait one then wait two until it's value read, then go to determine to decide if count or not.
-                if (horz_patterns[box_min_x + x_read] && vert_patterns[box_min_y + y_read]) begin
+                if (lookup_trigger) begin
                     state <= WAIT_ONE;
                     x_end <= x_read;
                     y_end <= y_read;
@@ -211,21 +244,24 @@ module cross_patterns_copy #(parameter HEIGHT = 480,
                         // but still running through the last one yet, may find something
 
                         if (center_index > 2'b11) begin     ///EDIT
-                            centers_not_found_error <= 1'b1;
-                        end else if (center_index < 2'b11) begin
-                            centers_not_found_error2 <= 1'b1;
+                            centers_not_found_error <= 1'b1;    //red you have more than 3 centers detected
+                        end else if (center_index < 2'b11) begin   
+                            centers_not_found_error2 <= 1'b1;   //green you have less than 3 centers detected
                         end
                     end
                 end
 
                 // add center of current box if majority is black
-                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>1) + ((counter_white + counter_black)>>3)) ) begin
-                        ///EDIT removed the if
+                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>2)) ) begin
+                        //EDIT removed the if
+                        //EDIT back to 75% threshold
                         center_index <= center_index + 1;
                         // POTENTIAL ERROR: SYSTEM VERILOG CAN OVERFLOW IN THE MIDDLE OF ADDITOIN, SO OFFSET WITH 1'b0
                         
                         centers_x[center_index] <= (({1'b0, x_start} + {1'b0, x_end})>>1) + box_min_x; 
                         centers_y[center_index] <= (({1'b0, y_start} + {1'b0, y_end})>>1) + box_min_y;
+                        counter_black_s[center_index] <= counter_black;
+                        counter_white_s[center_index] <= counter_white;
 
                 end 
             end 
