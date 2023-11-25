@@ -83,7 +83,7 @@ module cross_patterns_tb;
         // initialize bound_x and bound_y data
         bound_x[0] <= 122;
         bound_y[0] <= 122;// woowww syymmetric ;D
-        bound_x[1] <= 422;
+        bound_x[1] <= 442;
         bound_y[1] <= 442;
         #10;
         rst_in = 1;
