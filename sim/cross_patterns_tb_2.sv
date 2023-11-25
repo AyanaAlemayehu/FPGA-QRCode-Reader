@@ -1,12 +1,12 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-// TESTBENCH DEPENDENT ON PERFECTLY CENTERED VERSION 1 QR CODE
+// TESTBENCH DEPENDENT ON PERFECTLY CENTERED VERSION 1 QR CODE THATS ROTATED AND OFFCENTER
 // IMAGE NEEDS TO BE INVERTED BECAUSE OF PECULARITIES WITH img-to-mem.py
 // currently has inverted qr code loaded
 
-// MODULE PASSES PURE NON-ROTATED TESTBENCH
-module cross_patterns_tb;
+// MODULE PASSES ROTATED TESTBENCH
+module cross_patterns_tb_2;
     // NEVER TESTED
     //make logics for inputs and outputs!
     logic clk_in;
@@ -52,7 +52,7 @@ module cross_patterns_tb;
     //initial block...this is our test simulation
     initial begin
         $dumpfile("cross.vcd"); //file to store value change dump (vcd)
-        $dumpvars(0,cross_patterns_tb); //store everything at the current level and below
+        $dumpvars(0,cross_patterns_tb_2); //store everything at the current level and below
         // visualizes the arrays
         $dumpvars(0, centers_x[0]);
         $dumpvars(0, centers_x[1]);
@@ -67,26 +67,30 @@ module cross_patterns_tb;
         for (int i = 0; i < 480; i++) begin
             // determined from the qr code png
             // each if statement is its own finder pattern
-            if (i > 46 && i < 113)
+            if (i > 195 && i < 215)
                 horz_patterns[i] <= 1'b1;
-            else if (i > 366 && i < 433)
+            else if (i > 255 && i < 275)
+                horz_patterns[i] <= 1'b1;
+            else if (i > 400 && i < 425)
                 horz_patterns[i] <= 1'b1;
             else
                 horz_patterns[i] <= 1'b0;
             
             
-            if (i > 46 && i < 113)
+            if (i > 190 && i < 210)
                 vert_patterns[i] <= 1'b1;
-            else if (i > 366 && i < 433)
+            else if (i > 250 && i < 275)
+                vert_patterns[i] <= 1'b1;
+            else if (i > 340 && i < 360)
                 vert_patterns[i] <= 1'b1;
             else
                 vert_patterns[i] <= 1'b0;
         end
         // initialize bound_x and bound_y data
-        bound_x[0] <= 122;
-        bound_y[0] <= 122;// woowww syymmetric ;D
-        bound_x[1] <= 442;
-        bound_y[1] <= 442;
+        bound_x[0] <= 224;
+        bound_y[0] <= 224;// woowww syymmetric ;D
+        bound_x[1] <= 284;
+        bound_y[1] <= 284;
         #10;
         rst_in = 1;
         #10;
