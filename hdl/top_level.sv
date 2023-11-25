@@ -494,7 +494,7 @@ module top_level(
   logic [19:0] counter_black_s [2:0];
   logic [19:0] counter_white_s [2:0];
 
-  cross_patterns_new cross_mod
+  cross_patterns cross_mod
     (
         .clk_in(clk_pixel),
         .rst_in(sys_rst),
@@ -554,8 +554,8 @@ module top_level(
         // add switches to control what's on hdmi after this stage.
         // reading frame buffer goes to hdmi if state is streaming
         // i undid the rotation that img_addr_rot did to BRAM_one for sake of debugging
-        BRAM_one_reading_address = hcount_scaled + vcount_scaled*STORED_WIDTH;
-        BRAM_one_reading_enb = valid_addr_scaled;
+        BRAM_one_reading_address = img_addr_rot;
+        BRAM_one_reading_enb = valid_addr_rot;
         frame_buffer_reading_address = img_addr_rot;
         frame_buffer_reading_enb = valid_addr_rot;
         // hdmi_out_raw_pixel = BRAM_one_reading_pixel;   //already written in hdmi control
@@ -570,28 +570,28 @@ module top_level(
     WHAT TO SHOW ON SCREEN:
   */
 
-  // Controling what goes on screen
+// Controling what goes on screen
   always_comb begin  //add switches
     case ({sw[5], sw[4], sw[3]})
       3'b000: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
       3'b001: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
       3'b010: hdmi_out_raw_pixel = (state == FINISHED) ? 
-                                  (BRAM_one_horizontal_finder_encodings[vcount_scaled]) &&
-                                  (BRAM_one_vertical_finder_encodings[hcount_scaled]) :  1'b0;
+                                  (BRAM_one_horizontal_finder_encodings[hcount_scaled]) &&
+                                  (BRAM_one_vertical_finder_encodings[STORED_WIDTH - vcount_scaled]) :  1'b0;
       3'b011: hdmi_out_raw_pixel = (state == FINISHED) ?
-                                  (BRAM_one_horizontal_finder_encodings_clean[vcount_scaled]) &&
-                                  (BRAM_one_vertical_finder_encodings_clean[hcount_scaled]) :  1'b0;
+                                  (BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
+                                  (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled]) :  1'b0;
 
-      3'b100: hdmi_out_raw_pixel = (state == FINISHED) ? ((hcount_scaled == bounds_x[0]) ||
-                                                         (hcount_scaled == bounds_x[1])) ||
-                                                         ((vcount_scaled == bounds_y[0]) ||
-                                                         (vcount_scaled == bounds_y[1])) ||
-                                                         ((BRAM_one_horizontal_finder_encodings_clean[vcount_scaled]) &&
-                                  (BRAM_one_vertical_finder_encodings_clean[hcount_scaled])): 1'b0;
+      3'b100: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == bounds_x[0]) ||
+                                                         (STORED_WIDTH - vcount_scaled == bounds_x[1])) ||
+                                                         ((hcount_scaled == bounds_y[0]) ||
+                                                         ( hcount_scaled == bounds_y[1])) ||
+                                                         ((BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
+                                  (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled])): 1'b0;
 
-      3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? ((hcount_scaled == centers_x_cross[0]) && (vcount_scaled == centers_y_cross[0])) ||
-                                                         ((hcount_scaled == centers_x_cross[1]) && (vcount_scaled == centers_y_cross[1])) ||
-                                                         ((hcount_scaled == centers_x_cross[2]) && (vcount_scaled == centers_y_cross[2])) : 1'b0;
+      3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) ||
+                                                         ((STORED_WIDTH - vcount_scaled == centers_x_cross[1]) && (hcount_scaled == centers_y_cross[1])) ||
+                                                         ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) : 1'b0;
     
       default: hdmi_out_raw_pixel = 1'b0;
     endcase

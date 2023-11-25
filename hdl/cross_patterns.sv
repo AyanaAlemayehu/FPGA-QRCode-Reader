@@ -2,7 +2,7 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module cross_patterns_new #(parameter HEIGHT = 480,
+module cross_patterns #(parameter HEIGHT = 480,
                             parameter WIDTH = 480)
     (
         input wire clk_in,
@@ -25,13 +25,18 @@ module cross_patterns_new #(parameter HEIGHT = 480,
     );
 
 
+
     typedef enum {RESET, PENDING, WAIT_ONE, WAIT_TWO, DETERMINE,CALCULATE, FINISHED} fsm_state;
     fsm_state state = RESET;
 
     logic [8:0] x_read, y_read;  // current coordinates checking pixel at, reset to zero at rst_in and whenever we switch box
     // ERROR: FORGOT TO OFFSET READING ADDRESS ANDDDDDDD THIS WAS CALLED READING_ADDRESS (WRONG NAME)
-    assign address_reading = box_min_x + x_read + (y_read + box_min_y) * WIDTH;
+    // triggers used for debugging
+    logic lookup_trigger, match_trigger;
+    assign lookup_trigger = horz_patterns[box_min_x + x_read] && vert_patterns[box_min_y + y_read];
+    assign match_trigger =  counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>1) - ((counter_white + counter_black)>>3));
     
+    assign address_reading = box_min_x + x_read + (y_read + box_min_y) * WIDTH;
     logic [8:0] box_min_x, box_min_y, box_max_x, box_max_y; // current box boundries, changes whenever we switch zone.
     logic [1:0] zone_x, zone_y;
 
@@ -122,7 +127,7 @@ module cross_patterns_new #(parameter HEIGHT = 480,
             PENDING: begin
                 // check if pixel is white to see if need to read it's value.
                 // if pixel is white go to wait one then wait two until it's value read, then go to determine to decide if count or not.
-                if (horz_patterns[box_min_x + x_read] && vert_patterns[box_min_y + y_read]) begin
+                if (lookup_trigger) begin
                     state <= WAIT_ONE;
                     x_end <= x_read;
                     y_end <= y_read;
@@ -221,8 +226,9 @@ module cross_patterns_new #(parameter HEIGHT = 480,
                 end
 
                 // add center of current box if majority is black
-                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>1) - ((counter_white + counter_black)>>3)) ) begin
-                        ///EDIT removed the if
+                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>2)) ) begin
+                        //EDIT removed the if
+                        //EDIT back to 75% threshold
                         center_index <= center_index + 1;
                         // POTENTIAL ERROR: SYSTEM VERILOG CAN OVERFLOW IN THE MIDDLE OF ADDITOIN, SO OFFSET WITH 1'b0
                         
