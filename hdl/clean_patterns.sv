@@ -12,7 +12,7 @@ module clean_patterns #(parameter WIDTH = 480)
         output logic [479:0] clean_pattern
     );
 
-    parameter MIN_SIZE = 4;
+    parameter MIN_SIZE = 6;
 
     typedef enum {RESET, CLEAN_1, CLEAN_2, FINISHED} fsm_state;
     fsm_state state = RESET;
@@ -57,7 +57,11 @@ module clean_patterns #(parameter WIDTH = 480)
                                 if (index > 1)
                                     clean_pattern[index-2] <= 1'b1;
                                 if (index > 2)
-                                    clean_pattern[index-2] <= 1'b1;
+                                    clean_pattern[index-3] <= 1'b1;
+                                if (index > 3)
+                                    clean_pattern[index-4] <= 1'b1;
+                                if (index > 4)
+                                    clean_pattern[index-5] <= 1'b1;
                             end
                         end
 
