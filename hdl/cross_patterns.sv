@@ -226,9 +226,9 @@ module cross_patterns #(parameter HEIGHT = 480,
                 end
 
                 // add center of current box if majority is black
-                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>2)) ) begin
+                if ( counter_black > ((counter_white + counter_black) - ((counter_white + counter_black)>>3)) ) begin
                         //EDIT removed the if
-                        //EDIT back to 75% threshold
+                        //EDIT up to 87.5% threshold
                         center_index <= center_index + 1;
                         // POTENTIAL ERROR: SYSTEM VERILOG CAN OVERFLOW IN THE MIDDLE OF ADDITOIN, SO OFFSET WITH 1'b0
                         

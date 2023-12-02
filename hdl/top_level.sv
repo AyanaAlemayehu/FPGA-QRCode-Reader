@@ -106,7 +106,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -161,16 +161,16 @@ module top_level(
 
           CROSS: begin
                 led <= 16'b10000000;
-                state <= (cross_valid)? FINISHED: CROSS;
+                state <= (cross_valid)? FIND_MOD: CROSS;
+          end
+
+          FIND_MOD: begin
+                led <= 16'b100000000;
+                state <= (mod_size_valid)? FINISHED: FIND_MOD;
           end
 
           FINISHED: begin
-                case ({sw[7], sw[6]})
-                2'b00: led <= counter_black_s[0];
-                2'b01: led <= counter_white_s[0];
-                2'b10: led <= counter_black_s[1];
-                2'b11: led <= counter_white_s[1];
-                endcase
+                led <= module_size;
           end
 
 
@@ -515,6 +515,21 @@ module top_level(
         .counter_white_s(counter_white_s)
     );
 
+  logic [8:0] module_size;
+  logic mod_size_valid;
+  find_mod_size #(.MODULES(15))// 15 modules between version 1 qr codes
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .centers_x(centers_x_cross),
+        .centers_y(centers_y_cross),
+        .start_downsample(cross_valid),
+
+        .mod_size(module_size), // oversized by a lot lol
+        .mod_size_valid(mod_size_valid)
+    );
+
+
 
   /*
     Controling Memory Ports
@@ -558,7 +573,6 @@ module top_level(
         BRAM_one_reading_enb = valid_addr_rot;
         frame_buffer_reading_address = img_addr_rot;
         frame_buffer_reading_enb = valid_addr_rot;
-        // hdmi_out_raw_pixel = BRAM_one_reading_pixel;   //already written in hdmi control
       end
 
     end
@@ -607,9 +621,38 @@ module top_level(
   assign hdmi_out_pixel = valid_addr_rot_pipe[1]?hdmi_out_raw_pixel:1'b0;
 
   // binarized output routed directly to tmds encoders after 8 bit conversion
-  assign red = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
-  assign green = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
-  assign blue = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+  always_comb begin
+    if ({sw[5], sw[4], sw[3]} == 3'b101) begin
+      // custom colors for each detected center
+      if ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) begin
+        red = 8'd255;
+        green = 8'd0;
+        blue = 8'd0; 
+      end
+      else if ((STORED_WIDTH - vcount_scaled == centers_x_cross[1]) && (hcount_scaled == centers_y_cross[1])) begin
+        red = 8'd0;
+        green = 8'd255;
+        blue = 8'd0; 
+      end
+      else if ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) begin
+        red = 8'd0;
+        green = 8'd0;
+        blue = 8'd255; 
+      end
+      else begin
+        red = 8'd0;
+        green = 8'd0;
+        blue = 8'd20; 
+      end
+    end
+    else begin
+      red = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+      green = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+      blue = hdmi_out_pixel == 1'b0 ? 8'b0 : 8'd255;
+    end
+
+  end
+
 
 
   //three tmds_encoders (blue, green, red)
