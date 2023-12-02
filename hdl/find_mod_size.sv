@@ -2,7 +2,7 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module find_mod_size #(parameter MODULES = 19)// 15 modules between version 1 qr codes
+module find_mod_size #(parameter MODULES = 18)
     (
         input wire clk_in,
         input wire rst_in,
@@ -14,7 +14,7 @@ module find_mod_size #(parameter MODULES = 19)// 15 modules between version 1 qr
         output logic mod_size_valid
     );
 
-    logic [1:0] center_index; // index 0 is top left, 1 is bottom left, 2 is bottom right
+    logic [1:0] center_index; // index 0 is bottom left, 1 is top left, 2 is top right (in post rotated qr code)
     logic [10:0] dividend, divisor;
     logic [10:0] result;
     logic start_divide, finished_divide;
@@ -53,15 +53,15 @@ module find_mod_size #(parameter MODULES = 19)// 15 modules between version 1 qr
                     case (center_index)
 
                         2'b00: begin
-                            dividend <= centers_x[0] + centers_x[1];
-                            divisor <= MODULES;// we know its 15 modules between
+                            dividend <= centers_x[1] - centers_x[0];
+                            divisor <= MODULES;
                             state <= DIVIDE;
                             start_divide <= 1'b1;
                         end
 
                         2'b01: begin
-                            dividend <= centers_y[1] + centers_y[2];
-                            divisor <= MODULES;// we know its 15 modules between
+                            dividend <= centers_y[2] - centers_y[1];
+                            divisor <= MODULES;
                             state <= DIVIDE;
                             start_divide <= 1'b1;
                         end

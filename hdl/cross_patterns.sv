@@ -19,9 +19,7 @@ module cross_patterns #(parameter HEIGHT = 480,
         output logic [8:0] centers_y [2:0],
         output logic centers_valid,
         output logic centers_not_found_error,
-        output logic centers_not_found_error2,
-        output logic [19:0] counter_black_s [2:0],
-        output logic [19:0] counter_white_s [2:0]
+        output logic centers_not_found_error2
     );
 
 
@@ -234,8 +232,6 @@ module cross_patterns #(parameter HEIGHT = 480,
                         
                         centers_x[center_index] <= (({1'b0, x_start} + {1'b0, x_end})>>1) + box_min_x; 
                         centers_y[center_index] <= (({1'b0, y_start} + {1'b0, y_end})>>1) + box_min_y;
-                        counter_black_s[center_index] <= counter_black;
-                        counter_white_s[center_index] <= counter_white;
 
                 end 
             end 

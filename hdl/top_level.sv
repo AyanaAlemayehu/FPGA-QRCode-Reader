@@ -491,8 +491,6 @@ module top_level(
   logic [8:0] centers_x_cross [2:0];
   logic [8:0] centers_y_cross [2:0];
   logic cross_valid;
-  logic [19:0] counter_black_s [2:0];
-  logic [19:0] counter_white_s [2:0];
 
   cross_patterns cross_mod
     (
@@ -510,9 +508,7 @@ module top_level(
         .centers_y(centers_y_cross),
         .centers_valid(cross_valid),
         .centers_not_found_error(rgb0[0]),// using rgb to err out
-        .centers_not_found_error2(rgb0[1]),
-        .counter_black_s(counter_black_s),
-        .counter_white_s(counter_white_s)
+        .centers_not_found_error2(rgb0[1])
     );
 
   logic [8:0] module_size;
@@ -605,8 +601,7 @@ module top_level(
 
       3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) ||
                                                          ((STORED_WIDTH - vcount_scaled == centers_x_cross[1]) && (hcount_scaled == centers_y_cross[1])) ||
-                                                         ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) : 1'b0;
-    
+                                                         ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) : 1'b0;    
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end
@@ -642,7 +637,7 @@ module top_level(
       else begin
         red = 8'd0;
         green = 8'd0;
-        blue = 8'd20; 
+        blue = 8'd0; 
       end
     end
     else begin
