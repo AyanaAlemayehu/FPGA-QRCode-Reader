@@ -101,12 +101,13 @@ module top_level(
     localparam HEIGHT = 480;
     localparam STORED_WIDTH = 480;
     localparam STORED_HEIGHT = 480;
+    localparam QR_SIZE = 21;
 
 
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, DOWNSAMPLE, FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -166,11 +167,24 @@ module top_level(
 
           FIND_MOD: begin
                 led <= 16'b100000000;
-                state <= (mod_size_valid)? FINISHED: FIND_MOD;
+                state <= (mod_size_valid)? DOWNSAMPLE: FIND_MOD;
+          end
+
+          DOWNSAMPLE: begin
+                led <= 16'b1000000000;
+                state <= (valid_qr)? FINISHED: DOWNSAMPLE;
           end
 
           FINISHED: begin
-                led <= module_size;
+                case ({btn[1], btn[2], btn[3]})
+                  3'b000 : led <= centers_x_cross[0];
+                  3'b001 : led <= centers_x_cross[1];
+                  3'b010 : led <= centers_x_cross[2];
+                  3'b011 : led <= centers_y_cross[0];
+                  3'b100 : led <= centers_y_cross[1];
+                  3'b101 : led <= centers_y_cross[2];
+                  3'b110 : led <= module_size;
+                endcase
           end
 
 
@@ -513,7 +527,7 @@ module top_level(
 
   logic [8:0] module_size;
   logic mod_size_valid;
-  find_mod_size #(.MODULES(15))// 15 modules between version 1 qr codes
+  find_mod_size #(.MODULES(14))// 15 modules between version 1 qr codes
     (
         .clk_in(clk_pixel),
         .rst_in(sys_rst),
@@ -523,6 +537,27 @@ module top_level(
 
         .mod_size(module_size), // oversized by a lot lol
         .mod_size_valid(mod_size_valid)
+    );
+
+    logic start_downsample;
+    logic BRAM_one_downsample_reading_pixel;
+    logic [19:0] BRAM_one_downsample_address;
+    logic [440:0] qr_code;
+    logic valid_qr;
+
+    downsample #(.WIDTH(STORED_WIDTH))
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .start_downsample(mod_size_valid),
+        .reading_pixel(BRAM_one_downsample_reading_pixel),
+        .module_size(module_size),
+        .centers_x(centers_x_cross),
+        .centers_y(centers_y_cross),
+
+        .reading_address(BRAM_one_downsample_address),
+        .qr_code(qr_code),
+        .valid_qr(valid_qr)
     );
 
 
@@ -559,7 +594,11 @@ module top_level(
         BRAM_one_reading_address = BRAM_one_cross_reading_address;
         BRAM_one_cross_reading_pixel = BRAM_one_reading_pixel;
         BRAM_one_reading_enb = 1'b1;
-
+      end
+      else if (state == DOWNSAMPLE) begin
+        BRAM_one_reading_address <= BRAM_one_downsample_address;
+        BRAM_one_downsample_reading_pixel <= BRAM_one_reading_pixel;
+        BRAM_one_reading_enb <= 1'b1;
       end
       else if (state == FINISHED) begin
         // add switches to control what's on hdmi after this stage.
@@ -601,7 +640,10 @@ module top_level(
 
       3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) ||
                                                          ((STORED_WIDTH - vcount_scaled == centers_x_cross[1]) && (hcount_scaled == centers_y_cross[1])) ||
-                                                         ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) : 1'b0;    
+                                                         ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) : 1'b0;  
+      3'b110: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
+                                                         ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
+                                                         : 1'b0;
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end

@@ -2,7 +2,7 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module find_mod_size #(parameter MODULES = 18)
+module find_mod_size #(parameter MODULES = 14)
     (
         input wire clk_in,
         input wire rst_in,

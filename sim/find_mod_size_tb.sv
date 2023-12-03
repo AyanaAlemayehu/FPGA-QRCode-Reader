@@ -41,8 +41,15 @@ module find_mod_size_tb;
         rst_in = 1;
         #10;
         rst_in = 0;
-        centers_x[0] = 
-        #10;
+        centers_y[0] = 111;
+        centers_y[1] = 100;
+        centers_y[2] = 330;
+
+        centers_x[0] = 110;
+        centers_x[1] = 370;
+        centers_x[2] = 360;
+        start_downsample = 1'b1; 
+        #1000;
 
         $display("Finishing Sim"); //print nice message
         $finish;
