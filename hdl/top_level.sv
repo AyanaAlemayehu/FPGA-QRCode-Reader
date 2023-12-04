@@ -107,7 +107,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, DOWNSAMPLE, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, DOWNSAMPLE_0, DOWNSAMPLE_1, DOWNSAMPLE_2, FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -167,12 +167,22 @@ module top_level(
 
           FIND_MOD: begin
                 led <= 16'b100000000;
-                state <= (mod_size_valid)? DOWNSAMPLE: FIND_MOD;
+                state <= (mod_size_valid)? DOWNSAMPLE_0: FIND_MOD;
           end
 
-          DOWNSAMPLE: begin
+          DOWNSAMPLE_0: begin
                 led <= 16'b1000000000;
-                state <= (valid_qr)? FINISHED: DOWNSAMPLE;
+                state <= (valid_qr_0)? DOWNSAMPLE_1: DOWNSAMPLE_0;
+          end
+
+          DOWNSAMPLE_1: begin
+                led <= 16'b10000000000;
+                state <= (valid_qr_1)? DOWNSAMPLE_2: DOWNSAMPLE_1;
+          end
+
+          DOWNSAMPLE_2: begin
+                led <= 16'b100000000000;
+                state <= (valid_qr_2)? FINISHED: DOWNSAMPLE_2;
           end
 
           FINISHED: begin
@@ -539,28 +549,76 @@ module top_level(
         .mod_size_valid(mod_size_valid)
     );
 
-    logic start_downsample;
-    logic BRAM_one_downsample_reading_pixel;
-    logic [19:0] BRAM_one_downsample_address;
-    logic [440:0] qr_code;
-    logic valid_qr;
+    logic BRAM_one_downsample_reading_pixel_0;
+    logic [19:0] BRAM_one_downsample_address_0;
+    logic [440:0] qr_code_0;
+    logic valid_qr_0;
 
-    downsample #(.WIDTH(STORED_WIDTH))
+    downsample_0 #(.WIDTH(STORED_WIDTH))
     (
         .clk_in(clk_pixel),
         .rst_in(sys_rst),
         .start_downsample(mod_size_valid),
-        .reading_pixel(BRAM_one_downsample_reading_pixel),
+        .reading_pixel(BRAM_one_downsample_reading_pixel_0),
         .module_size(module_size),
         .centers_x(centers_x_cross),
         .centers_y(centers_y_cross),
 
-        .reading_address(BRAM_one_downsample_address),
-        .qr_code(qr_code),
-        .valid_qr(valid_qr)
+        .reading_address(BRAM_one_downsample_address_0),
+        .qr_code(qr_code_0),
+        .valid_qr(valid_qr_0)
     );
 
+    logic BRAM_one_downsample_reading_pixel_1;
+    logic [19:0] BRAM_one_downsample_address_1;
+    logic [440:0] qr_code_1;
+    logic valid_qr_1;
 
+    downsample_1 #(.WIDTH(STORED_WIDTH))
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .start_downsample(valid_qr_0),
+        .reading_pixel(BRAM_one_downsample_reading_pixel_1),
+        .module_size(module_size),
+        .centers_x(centers_x_cross),
+        .centers_y(centers_y_cross),
+
+        .reading_address(BRAM_one_downsample_address_1),
+        .qr_code(qr_code_1),
+        .valid_qr(valid_qr_1)
+    );
+
+    logic BRAM_one_downsample_reading_pixel_2;
+    logic [19:0] BRAM_one_downsample_address_2;
+    logic [440:0] qr_code_2;
+    logic valid_qr_2;
+
+    downsample_2 #(.WIDTH(STORED_WIDTH))
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .start_downsample(valid_qr_1),
+        .reading_pixel(BRAM_one_downsample_reading_pixel_2),
+        .module_size(module_size),
+        .centers_x(centers_x_cross),
+        .centers_y(centers_y_cross),
+
+        .reading_address(BRAM_one_downsample_address_2),
+        .qr_code(qr_code_2),
+        .valid_qr(valid_qr_2)
+    );
+
+  logic [440:0] qr_code;
+
+
+  downsample_combine #(.CODE_SIZE(QR_SIZE))
+      (
+          .qr_0(qr_code_0),
+          .qr_1(qr_code_1),
+          .qr_2(qr_code_2),
+          .qr_code(qr_code)
+      );
 
   /*
     Controling Memory Ports
@@ -595,9 +653,19 @@ module top_level(
         BRAM_one_cross_reading_pixel = BRAM_one_reading_pixel;
         BRAM_one_reading_enb = 1'b1;
       end
-      else if (state == DOWNSAMPLE) begin
-        BRAM_one_reading_address <= BRAM_one_downsample_address;
-        BRAM_one_downsample_reading_pixel <= BRAM_one_reading_pixel;
+      else if (state == DOWNSAMPLE_0) begin
+        BRAM_one_reading_address <= BRAM_one_downsample_address_0;
+        BRAM_one_downsample_reading_pixel_0 <= BRAM_one_reading_pixel;
+        BRAM_one_reading_enb <= 1'b1;
+      end
+      else if (state == DOWNSAMPLE_1) begin
+        BRAM_one_reading_address <= BRAM_one_downsample_address_1;
+        BRAM_one_downsample_reading_pixel_1 <= BRAM_one_reading_pixel;
+        BRAM_one_reading_enb <= 1'b1;
+      end
+      else if (state == DOWNSAMPLE_2) begin
+        BRAM_one_reading_address <= BRAM_one_downsample_address_2;
+        BRAM_one_downsample_reading_pixel_2 <= BRAM_one_reading_pixel;
         BRAM_one_reading_enb <= 1'b1;
       end
       else if (state == FINISHED) begin
@@ -609,7 +677,6 @@ module top_level(
         frame_buffer_reading_address = img_addr_rot;
         frame_buffer_reading_enb = valid_addr_rot;
       end
-
     end
 
   // NOTE: LETS JUST GET RID OF ROTATIONS POST FRAME BUFFER BECAUSE ITS THE IMAGE ADDRESS THATS ROTATED, NOT WHAT WE SHOW
@@ -621,27 +688,36 @@ module top_level(
 
 // Controling what goes on screen
   always_comb begin  //add switches
-    case ({sw[5], sw[4], sw[3]})
-      3'b000: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
-      3'b001: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
-      3'b010: hdmi_out_raw_pixel = (state == FINISHED) ? 
+    case ({sw[6], sw[5], sw[4], sw[3]})
+      4'b0000: hdmi_out_raw_pixel = frame_buffer_reading_pixel;
+      4'b0001: hdmi_out_raw_pixel = state == AVERAGING ? 1'b0 : BRAM_one_reading_pixel;
+      4'b0010: hdmi_out_raw_pixel = (state == FINISHED) ? 
                                   (BRAM_one_horizontal_finder_encodings[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings[STORED_WIDTH - vcount_scaled]) :  1'b0;
-      3'b011: hdmi_out_raw_pixel = (state == FINISHED) ?
+      4'b0011: hdmi_out_raw_pixel = (state == FINISHED) ?
                                   (BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled]) :  1'b0;
 
-      3'b100: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == bounds_x[0]) ||
+      4'b0100: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == bounds_x[0]) ||
                                                          (STORED_WIDTH - vcount_scaled == bounds_x[1])) ||
                                                          ((hcount_scaled == bounds_y[0]) ||
                                                          ( hcount_scaled == bounds_y[1])) ||
                                                          ((BRAM_one_horizontal_finder_encodings_clean[hcount_scaled]) &&
                                   (BRAM_one_vertical_finder_encodings_clean[STORED_WIDTH - vcount_scaled])): 1'b0;
 
-      3'b101: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) ||
+      4'b0101: hdmi_out_raw_pixel = (state == FINISHED) ? ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) ||
                                                          ((STORED_WIDTH - vcount_scaled == centers_x_cross[1]) && (hcount_scaled == centers_y_cross[1])) ||
                                                          ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) : 1'b0;  
-      3'b110: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
+      4'b0110: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
+                                                         ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code_0[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
+                                                         : 1'b0;
+      4'b0111: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
+                                                         ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code_1[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
+                                                         : 1'b0;
+      4'b1000: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
+                                                         ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code_2[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
+                                                         : 1'b0;
+      4'b1001: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
                                                          ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
                                                          : 1'b0;
       default: hdmi_out_raw_pixel = 1'b0;
@@ -659,7 +735,7 @@ module top_level(
 
   // binarized output routed directly to tmds encoders after 8 bit conversion
   always_comb begin
-    if ({sw[5], sw[4], sw[3]} == 3'b101) begin
+    if ({sw[6], sw[5], sw[4], sw[3]} == 3'b0101) begin
       // custom colors for each detected center
       if ((STORED_WIDTH - vcount_scaled == centers_x_cross[0]) && (hcount_scaled == centers_y_cross[0])) begin
         red = 8'd255;
@@ -672,8 +748,8 @@ module top_level(
         blue = 8'd0; 
       end
       else if ((STORED_WIDTH - vcount_scaled == centers_x_cross[2]) && (hcount_scaled == centers_y_cross[2])) begin
-        red = 8'd0;
-        green = 8'd0;
+        red = 8'd50;
+        green = 8'd50;
         blue = 8'd255; 
       end
       else begin

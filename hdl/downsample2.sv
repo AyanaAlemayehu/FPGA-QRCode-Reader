@@ -2,7 +2,7 @@
 `default_nettype none
 // WE ARE READING THE NON-ROTATED QR CODE, SO WE WILL INDEX INTO THE 90 degree counter-clockwise qr code
 // FOR A 21 x 21 VERSION 1 QR CODE
-module downsample_0 #(parameter CODE_SIZE = 21,
+module downsample_2 #(parameter CODE_SIZE = 21,
                     parameter WIDTH = 480)
     (
         input wire clk_in,
@@ -23,15 +23,15 @@ module downsample_0 #(parameter CODE_SIZE = 21,
     fsm_state state = RESET;
     // x and y are indexes within [0, 21)
     // min_x and min_y are the pixel offset of the begining center index of the top left most square module
-    logic [10:0] x, y, min_x, min_y;
+    logic [10:0] x, y, max_x, max_y;
     
     // determines bounds of qr code
     // AGAIN, THE INDEXING AND ASSUMPTIONS IN THIS MODULE IS BASED UPON THE PRE-ROTATION QR CODE
     // thus the third finder pattern (determined by the 2nd index) is the location where we downsample
     always_comb begin
-        min_x = centers_x[0] - module_size*3;
-        min_y = centers_y[0] - module_size*3;
-        reading_address = min_x + x*module_size + (min_y + y*module_size)*WIDTH;
+        max_x = centers_x[2] + module_size*3;
+        max_y = centers_y[2] + module_size*3;
+        reading_address = max_x - x*module_size + (max_y - y*module_size)*WIDTH;
     end
     always_ff @(posedge clk_in) begin
         if (rst_in) begin
@@ -51,7 +51,7 @@ module downsample_0 #(parameter CODE_SIZE = 21,
 
                 DETERMINE: begin
                     if (reading_pixel)
-                        qr_code[x + y*CODE_SIZE] <= 1'b1;
+                        qr_code[(CODE_SIZE-1-x) + (CODE_SIZE-1-y)*CODE_SIZE] <= 1'b1;
                     if (x < CODE_SIZE-1) begin
                         x <= x + 1;
                         state <= WAIT_ONE;
