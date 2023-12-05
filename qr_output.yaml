@@ -1,0 +1,20 @@
+---
+cores:
+
+  lab8_io_core:
+    type: io
+
+    inputs:
+      block1_in: 32
+      block2_in: 32
+      block3_in: 32
+      block4_in: 32
+      block5_in: 32
+      datatype_in: 4
+      length_in: 8
+      #nothing for outputs, python does final processing
+uart:
+  port: "/dev/cu.usbserial-88742923004E1"
+  baudrate: 3000000
+  clock_freq: 74250000 #we have a different clock rate
+

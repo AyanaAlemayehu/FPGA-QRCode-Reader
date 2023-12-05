@@ -4,7 +4,9 @@
 module top_level(
   input wire clk_100mhz,
   input wire [15:0] sw, //all 16 input slide switches
+  input wire uart_rxd, // uart for manta instance
   input wire [3:0] btn, //all four momentary button switches
+  output logic uart_txd,
   output logic [15:0] led, //16 green output LEDs (located right above switches)
   output logic [2:0] rgb0, //rgb led
   output logic [2:0] rgb1, //rgb led
@@ -107,7 +109,7 @@ module top_level(
   /*
     Top Level State Maching
   */
-    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, DOWNSAMPLE_0, DOWNSAMPLE_1, DOWNSAMPLE_2, FINISHED} fsm_state;
+    typedef enum {RESET, STREAMING1, AVERAGING, HORIZ_PATTERNS, VERT_PATTERNS, CLEAN, BOUNDS, CROSS, FIND_MOD, DOWNSAMPLE_0, DOWNSAMPLE_1, DOWNSAMPLE_2, UNMASK, FINISHED} fsm_state;
     fsm_state state = RESET; // check here for errors
 
     always_ff @(posedge clk_pixel) begin
@@ -182,8 +184,13 @@ module top_level(
 
           DOWNSAMPLE_2: begin
                 led <= 16'b100000000000;
-                state <= (valid_qr_2)? FINISHED: DOWNSAMPLE_2;
+                state <= (valid_qr_2)? UNMASK: DOWNSAMPLE_2;
           end
+
+          UNMASK: begin
+            led <= 16'b1000000000000;
+            state <= (unmask_ready)? FINISHED: UNMASK;
+          end 
 
           FINISHED: begin
                 case ({btn[1], btn[2], btn[3]})
@@ -620,6 +627,48 @@ module top_level(
           .qr_code(qr_code)
       );
 
+
+  logic [440:0] qr_code_unmask;
+  logic unmask_ready;
+
+
+  unmask #(.MOD_SIZE(QR_SIZE))
+    (
+        .clk_in(clk_pixel),
+        .rst_in(sys_rst),
+        .start_unmask(valid_qr_2),
+        .downsampled_qr(qr_code),
+        .qr_unmasked(qr_code_unmask),
+        .unmask_ready(unmask_ready)
+    );
+
+  logic [3:0] data_type;
+  logic [7:0] data_length;
+  logic [7:0] bytes [18:0];
+
+  decode #(.MOD_SIZE(QR_SIZE))
+    (
+        .qr_unmasked(qr_code_unmask),
+        .data_type(data_type),
+        .data_length(data_length),
+        .bytes(bytes)
+    );
+
+
+  manta (
+    .clk(clk_pixel),
+    .rx(uart_rxd),
+    .tx(uart_txd),
+
+    .block1_in({bytes[0], bytes[1], bytes[2], bytes[3]}),
+    .block2_in({bytes[4], bytes[5], bytes[6], bytes[7]}),
+    .block3_in({bytes[8], bytes[9], bytes[10], bytes[11]}),
+    .block4_in({bytes[12], bytes[13], bytes[14], bytes[15]}),
+    .block5_in({bytes[16], bytes[17], bytes[18], 8'b0}),
+  
+    .datatype_in(data_type),
+    .length_in(data_length));
+
   /*
     Controling Memory Ports
   */
@@ -720,6 +769,10 @@ module top_level(
       4'b1001: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
                                                          ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
                                                          : 1'b0;
+      4'b1010: hdmi_out_raw_pixel = (state == FINISHED) ? ((((STORED_WIDTH - vcount_scaled) >> 4) < QR_SIZE) &&
+                                                         ((hcount_scaled) >> 4 < QR_SIZE)) ? qr_code_unmask[((STORED_WIDTH - vcount_scaled) >> 4) + ((hcount_scaled) >> 4)*QR_SIZE]: 1'b0
+                                                         : 1'b0;
+
       default: hdmi_out_raw_pixel = 1'b0;
     endcase
   end
