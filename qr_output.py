@@ -1,5 +1,7 @@
 import time
 from manta import Manta
+import binascii
+
 
 
 m = Manta('qr_output.yaml') # create manta python instance using yaml
@@ -14,15 +16,21 @@ length = m.lab8_io_core.length_in.get()
 data_type = m.lab8_io_core.datatype_in.get()
 
 
-total_blocks = format(block1, 'b') + format(block2, 'b') + format(block3, 'b') + format(block4, 'b') + format(block5, 'b')
-decoded_blocks = ""
-print("DECODED QR CODE:")
-if data_type == 4:
-    #this is bytes
-    for i in range(length):
-        if (total_blocks[i:i+8] != ''):
-            decoded_blocks += total_blocks[i:i+8]
+## NUmber of bits correction
+blocks = [block1, block2, block3, block4, block5]
+total_blocks = ""
+for b in blocks:
+    total_blocks += "0"*(32 - len(format(b, "b"))) + format(b, "b")
 
-print(decoded_blocks)
+
 print("data type: ", data_type)
-print("length: " , length)
+print("data length: " , length)
+
+print("DECODED QR CODE:")
+decoded_blocks = ""
+
+for i in range(length):
+    if (total_blocks[i*8:i*8+8] != ''):
+        n = int(total_blocks[i*8:i*8 + 8], 2)
+        print(n.to_bytes((n.bit_length() + 7) // 8, 'big').decode(), end="")
+print("")# adds a newline char

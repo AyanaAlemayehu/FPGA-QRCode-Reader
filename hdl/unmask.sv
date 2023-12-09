@@ -17,7 +17,7 @@ module unmask
     fsm_state state = RESET;
 
     logic [2:0] mask_type;  // have to neg the mask cause we assumed black is 0 and white is 1 so far, but actually black is 1 and white is 0.
-    assign mask_type = {~downsampled_qr[12+2*MOD_SIZE], ~downsampled_qr[12+3*MOD_SIZE], ~downsampled_qr[12+4*MOD_SIZE]};
+    assign mask_type = {(~downsampled_qr[12+2*MOD_SIZE] ^ 1'b1), (~downsampled_qr[12+3*MOD_SIZE] ^ 1'b0), (~downsampled_qr[12+4*MOD_SIZE] ^ 1'b1)};   //have to XOR mask pattern with 101.
 
     logic [9:0] address;
     assign address = x + y * MOD_SIZE;
