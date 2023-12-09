@@ -1,21 +1,10 @@
-# CURRENT OBJECTIVE: STAGE TWO
+# Overview
+This is our (Subhi and Ayana) 6.205 final project - a QR Code scanner implemented on an FPGA. Our scanner supports Version 1 QR Codes only that cannot be rotated (but can be translated from the center).
 
-## COMPLETED
-- made a rough idea of the average module
+# Hardware Requirements
+The only hardware requirements are a OV7670 camera module mounted onto a Seeeduino Xiao SAMD21 (with the camera arduino code included in the repository).
 
-## TODO
-- augment the top_level to multiplex HDMI output between frame_buffer & BRAM_one
-- fix averaging
-
-# OLD OBJECTIVES
-
-## COMPLETED
-- creating skeleton of stage one from lab 5
-- got rid of most warnings
-- converted camera output into binary output with adjustable threshold
-- grabbed 480x480 picture from the camera & binarize it
-- completed the rest of the modules in stage one
-
-
+# Software Requirements
+We output the decoded QR code through [manta](https://github.com/fischermoseley/manta)
 
 
